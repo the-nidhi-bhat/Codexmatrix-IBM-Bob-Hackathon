@@ -1,10 +1,10 @@
-#Codexmatrix — IBM Bob 2.0 Hackathon
+# Codexmatrix — IBM Bob 2.0 Hackathon
 
 Welcome to the official repository for **Team Codexmatrix**, participating in the **IBM Bob 2.0 Hackathon**.
 
 ---
 
-##Team
+## Team
 
 | Name | Role |
 |------|------|
@@ -15,7 +15,7 @@ Welcome to the official repository for **Team Codexmatrix**, participating in th
 
 ---
 
-##About IBM Bob
+## About IBM Bob
 
 This project is built using **IBM Bob** — IBM's AI software development assistant. IBM Bob is used throughout this project for meaningful engineering tasks including scaffolding, implementation, debugging, testing, documentation, and code review.
 
@@ -23,7 +23,7 @@ All IBM Bob contributions are tracked and documented in the [`IBM_BOB/`](./IBM_B
 
 ---
 
-##IBM Bob Evidence
+## IBM Bob Evidence
 
 | File | Purpose |
 |------|---------|
@@ -33,14 +33,14 @@ All IBM Bob contributions are tracked and documented in the [`IBM_BOB/`](./IBM_B
 
 ---
 
-##Project Status
+## Project Status
 
 > **The application is currently under active development.**  
 > The project concept and architecture will be defined once the hackathon challenge requirements are provided.
 
 ---
 
-##Repository Structure
+## Repository Structure
 
 ```
 IBM-Bob-Hackathon/
