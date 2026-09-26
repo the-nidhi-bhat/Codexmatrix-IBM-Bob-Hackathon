@@ -146,7 +146,7 @@ async function parseOrThrow(res: Response): Promise<AnalyzeResponse | GetRunResp
 
   // A `success: false` body whose error object is unreadable is a protocol
   // failure, not a domain error: name it instead of dereferencing undefined.
-  if (body.success === false) {
+  if (isRecord(body) && body.success === false) {
     throw new WorkflowApiError(
       "MALFORMED_ERROR",
       `Server returned an unreadable error response (HTTP ${res.status})`,
