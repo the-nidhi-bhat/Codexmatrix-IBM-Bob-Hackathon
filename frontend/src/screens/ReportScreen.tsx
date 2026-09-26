@@ -4,7 +4,6 @@ export default function ReportScreen() {
   const { state } = useWorkflow();
   const r = state.report;
   const repo = state.repository;
-  const net = state.safetyNet;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -19,28 +18,15 @@ export default function ReportScreen() {
           <div
             style={{
               padding: "4px 12px",
-              background: "#9e6a0315",
-              border: "1px solid #9e6a0333",
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
               borderRadius: 20,
               fontSize: 11,
-              color: "var(--yellow)",
+              color: "var(--muted)",
               fontWeight: 600,
             }}
           >
-            Demo · mock data
-          </div>
-          <div
-            style={{
-              padding: "4px 12px",
-              background: "#23863622",
-              border: "1px solid #23863644",
-              borderRadius: 20,
-              fontSize: 11,
-              color: "var(--green)",
-              fontWeight: 600,
-            }}
-          >
-            ✓ Session complete
+            {state.overallStatus}
           </div>
         </div>
       </div>
@@ -50,9 +36,9 @@ export default function ReportScreen() {
         <div className="section-title">Session Summary</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
           {[
-            { label: "Steps Completed",  value: r.stepsCompleted.toString(),  color: "var(--green)" },
-            { label: "Steps Rolled Back", value: r.stepsRolledBack.toString(), color: "var(--yellow)" },
-            { label: "Tests Passing",    value: `${net.passing}/${net.total}`,        color: "var(--green)" },
+            { label: "Steps Completed",  value: state.execution.status === "not_available" ? "not available" : r.stepsCompleted.toString(),  color: "var(--muted)" },
+            { label: "Steps Rolled Back", value: state.rollback.rollbackStatus === "not_triggered" ? "not triggered" : r.stepsRolledBack.toString(), color: "var(--muted)" },
+            { label: "Tests Passing",    value: state.checkpointResult?.tests.length ? `${state.checkpointResult.tests.filter((test) => test.status === "passed").length}/${state.checkpointResult.tests.length}` : "not run", color: "var(--muted)" },
             { label: "Duration",         value: r.duration,                   color: "var(--text)" },
           ].map(({ label, value, color }) => (
             <div
@@ -73,7 +59,7 @@ export default function ReportScreen() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
             { label: "Repository",     value: repo.name },
-            { label: "Runtime Upgrade", value: `${repo.runtime} → 18 LTS` },
+            { label: "Runtime", value: repo.runtime },
             { label: "Session started", value: r.startedAt },
             { label: "Session ended", value: r.endedAt },
           ].map(({ label, value }) => (

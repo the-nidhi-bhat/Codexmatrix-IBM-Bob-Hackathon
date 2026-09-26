@@ -27,9 +27,16 @@ import type {
 export const MOCK_REPOSITORY: Repository = {
   name: "legacy-ecommerce-api",
   url: "https://github.com/codexmatrix/legacy-ecommerce-api",
+  owner: "codexmatrix",
+  branch: "main",
+  currentCommit: "a3f9c12",
+  commitMessage: "Initial legacy application commit",
   runtime: "Node.js 12.x (LTS expired)",
   framework: "Express 4.17",
   language: "JavaScript (CommonJS)",
+  detectedLanguages: ["JavaScript"],
+  packageManager: "npm",
+  projectType: "web-api",
   lastCommit: "2021-03-14",
   linesOfCode: 4821,
   files: 63,
@@ -181,6 +188,12 @@ const VERIFICATION_FAIL: VerificationRun = {
  */
 export function buildMockWorkflowState(repoUrl: string): WorkflowState {
   return {
+    runId: "mock-run",
+    currentPhase: "EXECUTE",
+    overallStatus: "running",
+    createdAt: "2025-09-26T10:40:00Z",
+    updatedAt: "2025-09-26T10:52:44Z",
+    errors: [],
     repository: {
       ...MOCK_REPOSITORY,
       url: repoUrl,
@@ -283,6 +296,7 @@ export function buildMockWorkflowState(repoUrl: string): WorkflowState {
 
     execution: {
       currentStepId: 3,
+      status: "running",
       log: [
         { time: "10:42:01", text: "IBM Bob: Analyzing src/routes/orders.js…" },
         { time: "10:42:03", text: "IBM Bob: Found 14 var declarations in 63 lines." },

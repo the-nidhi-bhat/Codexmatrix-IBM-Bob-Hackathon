@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
-import type { WorkflowContextValue, WorkflowState, VerificationRun } from "./types";
+import { createContext, useContext, type ReactNode } from "react";
+import type { WorkflowContextValue, WorkflowState } from "./types";
 
 // ── Context ──────────────────────────────────────────────────────────────────
 
@@ -32,15 +32,8 @@ interface WorkflowProviderProps {
  * The state is owned by App (fetched from backend) and passed in as a prop.
  */
 export function WorkflowProvider({ state, children }: WorkflowProviderProps) {
-  const [verificationMode, setVerificationMode] = useState<"pass" | "fail">("fail");
-
-  const activeVerification: VerificationRun = state.verification[verificationMode];
-
   const value: WorkflowContextValue = {
     state,
-    verificationMode,
-    setVerificationMode,
-    activeVerification,
   };
 
   return (

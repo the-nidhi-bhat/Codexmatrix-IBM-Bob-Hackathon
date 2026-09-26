@@ -13,13 +13,24 @@
 
 export type RiskLevel = "low" | "medium" | "high";
 
-export type StepStatus = "pending" | "running" | "passed" | "failed" | "rolled_back" | "recovered";
+export type StepStatus = "pending" | "running" | "passed" | "failed" | "rolled_back" | "recovered" | (string & {});
 
 export type TestOutcome = "passed" | "failed" | "skipped";
 
 export type ChangeStatus = "applied" | "rolled-back" | "failed";
 
 export type AuditEntryType = "info" | "success" | "warn" | "error";
+
+export type WorkflowPhase =
+  | "UNDERSTAND"
+  | "PROTECT"
+  | "ASSESS"
+  | "PLAN"
+  | "EXECUTE"
+  | "VERIFY"
+  | "ROLLBACK"
+  | "RECOVER"
+  | "REPORT";
 
 // ── Repository ───────────────────────────────────────────────────────────────
 
@@ -28,9 +39,16 @@ export interface Repository {
   name: string;
   /** URL as entered by the user */
   url: string;
+  owner: string;
+  branch: string;
+  currentCommit: string;
+  commitMessage: string;
   runtime: string;
   framework: string;
   language: string;
+  detectedLanguages: string[];
+  packageManager: string;
+  projectType: string;
   lastCommit: string;
   linesOfCode: number;
   files: number;
@@ -89,8 +107,11 @@ export interface FileChange {
 
 export interface ExecutionState {
   currentStepId: number;
+  status: "not_available" | "running" | "complete" | "failed" | (string & {});
   log: ActivityLogEntry[];
   filesChanged: FileChange[];
+  startingCommit?: string;
+  modernizationCommit?: string;
 }
 
 // ── Verification (Verify phase) ──────────────────────────────────────────────
@@ -112,6 +133,8 @@ export interface VerificationRun {
   coverageNote: string;
   /** All test results for this run */
   tests: TestResult[];
+  exitCode?: number;
+  summary?: string;
 }
 
 // Derived counts — computed, not stored
@@ -125,7 +148,7 @@ export interface VerificationCounts {
 
 // ── Rollback (Rollback + Recover phases) ─────────────────────────────────────
 
-export type RollbackTimelineStatus = "regression" | "rollback" | "restored";
+export type RollbackTimelineStatus = "regression" | "rollback" | "restored" | (string & {});
 
 export interface RollbackTimelineEntry {
   status: RollbackTimelineStatus;
@@ -148,9 +171,9 @@ export interface RollbackEvent {
   /** Commit hash of the failing change (to be reverted) */
   failedCommit: string;
   /** Status of the rollback itself */
-  rollbackStatus: "pending" | "running" | "complete" | "failed";
+  rollbackStatus: "pending" | "running" | "complete" | "failed" | "not_triggered" | (string & {});
   /** Status of the verification run that confirmed recovery */
-  recoveryValidation: "pending" | "running" | "passed" | "failed";
+  recoveryValidation: "pending" | "running" | "passed" | "failed" | "not_run" | (string & {});
   /** Bob's root-cause explanation */
   bobExplanation: string;
   /** Safer alternative suggested by Bob */
@@ -202,6 +225,12 @@ export interface SessionReport {
  * This is what WorkflowContext exposes to every screen.
  */
 export interface WorkflowState {
+  runId: string;
+  currentPhase: WorkflowPhase;
+  overallStatus: "running" | "complete" | "failed" | "rolled_back";
+  createdAt: string;
+  updatedAt: string;
+  errors: string[];
   /** Derived from the URL the user entered on the Start screen */
   repository: Repository;
   safetyNet: SafetyNet;
@@ -210,15 +239,13 @@ export interface WorkflowState {
   risks: RiskFinding[];
   plan: PlanStep[];
   execution: ExecutionState;
-  /**
-   * Two pre-built verification scenarios so the demo can toggle between them.
-   * `pass` — 18 passed / 0 failed / 0 skipped
-   * `fail` — 16 passed / 2 failed / 0 skipped
-   */
+  /** Backend verification payloads; these can contain analysis checks before checkpoint execution. */
   verification: {
     pass: VerificationRun;
     fail: VerificationRun;
   };
+  /** Present only after a real checkpoint test result has been received. */
+  checkpointResult?: VerificationRun;
   rollback: RollbackEvent;
   report: SessionReport;
 }
@@ -227,12 +254,4 @@ export interface WorkflowState {
 
 export interface WorkflowContextValue {
   state: WorkflowState;
-  /**
-   * Which verification scenario is currently active.
-   * Screens toggle this; the context makes the active run available.
-   */
-  verificationMode: "pass" | "fail";
-  setVerificationMode: (mode: "pass" | "fail") => void;
-  /** Convenience: the currently active VerificationRun */
-  activeVerification: VerificationRun;
 }
