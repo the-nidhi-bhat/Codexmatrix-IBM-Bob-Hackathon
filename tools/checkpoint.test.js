@@ -125,7 +125,15 @@ check('a commit outside the branch history is refused', function () {
     if (!isAncestor) { outside = sha; return true; }
     return false;
   });
-  if (outside === null) { throw new Error('no local commit outside this branch history'); }
+  if (outside === null) {
+    // Every local branch is merged into this one (integration branch), so no
+    // branch tip qualifies. Manufacture a commit that is deliberately not in
+    // this history: a child of HEAD that no ref points at. Nothing in the
+    // repository, the index or the working tree is touched.
+    var tree = git(['rev-parse', 'HEAD^{tree}']).trim();
+    outside = git(['commit-tree', tree, '-p', 'HEAD', '-m',
+      'test: dangling commit that is not in this branch history']).trim();
+  }
   var run = runCheckpoint([outside]);
   if (!isRefused(run, /not an ancestor/)) { throw new Error('output: ' + run.output); }
 });
