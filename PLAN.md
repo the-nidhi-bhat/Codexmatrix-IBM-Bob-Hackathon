@@ -133,15 +133,40 @@ a TypeError; it now returns silently. All 18 behavioral tests pass.
 
 `node-uuid@1.4.x` was deprecated in 2014 when it was renamed to `uuid`. It is
 still installed from npm but is no longer maintained and does not appear in CVE
-databases under its current name. `uuid@9.x` is a drop-in replacement: the v4
+databases under its current name. `uuid@9.0.1` is a drop-in replacement: the v4
 output format is byte-for-byte identical; only the import API changes.
+
+`uuid@9.0.1` ships a Babel-compiled CJS bundle (`dist/index.js`) that avoids
+ES-module-only syntax. Its `v4` implementation uses `const` and `let` inside
+function bodies, which Node.js 6.17.1 (V8 5.1) supports. It falls back to the
+PRNG path when `crypto.randomUUID` is absent (Node < 14.17), so no runtime error
+occurs on Node 6.
+
+### Pre-commit compatibility check (mandatory, before modifying any file)
+
+Run this one-liner in the legacy container to confirm `uuid@9.0.1` loads and
+produces a valid UUID v4 under Node.js 6.17.1:
+
+```sh
+docker run --rm node:6 \
+  bash -c "npm install --prefix /tmp/uuid-check uuid@9.0.1 --silent >/dev/null 2>&1 && \
+           node -e \"var v4=require('/tmp/uuid-check/node_modules/uuid').v4; \
+                    var id=v4(); \
+                    var ok=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id); \
+                    console.log(ok ? 'uuid@9.0.1 OK: '+id : 'FAIL: '+id); \
+                    process.exit(ok?0:1)\""
+```
+
+Expected output: `uuid@9.0.1 OK: <uuid-v4-string>` with exit code 0.
+
+**If the check fails, stop and report the error before proceeding. Do not commit Step 2.**
 
 ### Files changed
 
 | File | Change |
 |---|---|
 | `server/game/index.js` | Change `require('node-uuid')` and `uuid.v4()` call |
-| `package.json` | Remove `node-uuid`, add `uuid@9.x` |
+| `package.json` | Remove `node-uuid`, add `uuid@9.0.1` (exact version, not range) |
 
 ### Exact change
 
@@ -173,8 +198,13 @@ var gameId = uuidv4();
 
 ```diff
 -    "node-uuid": "1.4.x",
-+    "uuid": "9.x",
++    "uuid": "9.0.1",
 ```
+
+Note: the version is pinned to `9.0.1` (the exact version validated by the
+pre-commit check above), not a floating range. `uuid@9.x` resolves to `9.0.1`
+today — there are only two published `9.x` releases (`9.0.0` and `9.0.1`) — but
+pinning guards against a future `9.0.2` that may change the CJS bundle format.
 
 ### Behavior preserved
 
@@ -189,13 +219,13 @@ docker run --rm -v "${PWD}:/app" -v get24-nm:/app/node_modules -w /app node:6 \
   bash -c "npm install --silent >/dev/null 2>&1; sh legacy/get24-baseline/tests/run.sh"
 ```
 
-Target test: `socket.test.js` — UUID_V4 regex assertion must pass.  
+Target test: `socket.test.js` — UUID_V4 regex assertion must pass.
 All 18 tests must pass.
 
 ### Rollback condition
 
-Any of the 18 tests fails, or `npm install` cannot resolve `uuid@9.x` in the
-legacy container.
+Any of the 18 tests fails, the pre-commit compatibility check fails, or
+`npm install` cannot resolve `uuid@9.0.1` in the legacy container.
 
 ### Recovery action
 
@@ -449,11 +479,33 @@ Express directly and must pass after this step.
 Step 4 contains all the Express boot code, making it easier to audit the upgrade
 in isolation.
 
+#### Port configuration scope (gap closed from readiness review)
+
+After Step 5, `app.set('port', process.env.PORT || config.port)` must remain at
+**module scope** — outside and before the `start()` function — so the port value
+is set before `start()` is called and is available to any code that reads it
+before the HTTP server binds. Do not move this line inside `start()`. The module
+layout after Step 5 is:
+
+```
+// module scope — runs on require()
+app.set('port', ...)
+app.use(logger(...))
+app.use(express.static(...))
+if (development) app.use(errorHandler())
+
+function start() {
+    var server = http.createServer(app).listen(app.get('port'), ...)
+    // ... socket.io wiring ...
+}
+module.exports = { start: start };
+```
+
 ### Files changed
 
 | File | Change |
 |---|---|
-| `server/index.js` | Remove `app.configure()` wrappers; inline middleware calls; replace three removed helpers |
+| `server/index.js` | Remove `app.configure()` wrappers; inline middleware calls at module scope; replace three removed helpers; keep `app.set('port', …)` at module scope |
 | `package.json` | Change `"express": "3.0.x"` → `"express": "4.x"`; add `serve-favicon`, `morgan`, `errorhandler` |
 
 ### Exact change
@@ -476,7 +528,8 @@ var logger = require('morgan');
 var errorHandler = require('errorhandler');
 ```
 
-Replace the two `app.configure()` blocks (lines 30–40 in the original):
+Replace the two `app.configure()` blocks (lines 30–40 in the original).
+`app.set('port', …)` stays at module scope:
 
 ```js
 // REMOVE:
@@ -490,8 +543,8 @@ app.configure('development', function () {
     app.use(express.errorHandler());
 });
 
-// REPLACE WITH:
-app.set('port', process.env.PORT || config.port);
+// REPLACE WITH (all lines at module scope, not inside start()):
+app.set('port', process.env.PORT || config.port);  // ← stays at module scope
 app.use(favicon(path.join(__dirname, '..', 'public', 'favicon.ico')));
 app.use(logger('dev'));
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -500,21 +553,68 @@ if (app.get('env') === 'development') {
 }
 ```
 
-Note: `serve-favicon` requires an explicit path. If `public/favicon.ico` does not
-exist, the middleware is simply omitted — the original `express.favicon()` served
-a default icon when no file was present. Confirm presence of `public/favicon.ico`
-before execution; if absent, omit the `favicon` line.
+#### Favicon — resolving the contradiction
+
+`public/favicon.ico` does **not** exist in the repository (confirmed during the
+readiness review). The existing `express.favicon()` in Express 3 served a built-in
+default icon when no file was present, and `http.test.js` line 44 asserts that
+`GET /favicon.ico` returns 200:
+
+```js
+['/favicon.ico', null, null]
+```
+
+Silently removing this middleware would cause that assertion to fail with a 404,
+which is a silent regression in the safety net. The least-invasive resolution that
+preserves the observable behavior is:
+
+**Add a minimal `public/favicon.ico` to the repository in the Step 5 commit.**
+
+A valid 1×1 transparent ICO file (16 bytes, no external tool required) fulfils
+this. Express 4's `express.static` will serve it automatically from the `public/`
+directory without any additional middleware. The `serve-favicon` line is therefore
+**not needed** — `express.static` handles it — and is omitted entirely:
+
+```js
+// REMOVE the serve-favicon require and the app.use(favicon(...)) line entirely.
+// express.static already serves public/favicon.ico when it exists.
+```
+
+Updated `package.json` — `serve-favicon` is not added:
+
+```diff
+-    "express": "3.0.x",
++    "express": "4.x",
++    "morgan": "1.x",
++    "errorhandler": "1.x",
+```
+
+The `favicon` variable and its `require` are not added to `server/index.js`.
+
+`public/favicon.ico` is a new file added in this commit. It must be a valid ICO
+file (at minimum: 16-byte 1×1 transparent ICO). The test assertion `['/favicon.ico',
+null, null]` checks only status 200 and non-zero byte count — both will pass once
+the file exists and `express.static` serves it.
 
 No other changes in this step. Socket.IO wiring is untouched.
+
+### Files actually changed (corrected from initial plan)
+
+| File | Change |
+|---|---|
+| `server/index.js` | Remove `app.configure()` wrappers; inline at module scope; `morgan` + `errorhandler`; no `serve-favicon` |
+| `package.json` | `"express": "3.0.x"` → `"express": "4.x"`; add `morgan@1.x`, `errorhandler@1.x` only |
+| `public/favicon.ico` | **New file** — minimal 1×1 transparent ICO; preserves `GET /favicon.ico → 200` behavior |
 
 ### Behavior preserved
 
 - `GET /` returns 200 with `Content-Type: text/html`.
 - Every static asset (`/css/styles.css`, `/js/*.js`) returns 200.
+- `GET /favicon.ico` returns 200 (now served by `express.static` from the new file).
 - `/socket.io/socket.io.js` returns 200 (served by Socket.IO, not Express static).
 - Unknown paths return 404.
-- All four `http.test.js` tests must pass.
-- Socket.IO layer (steps 6's territory) is not touched.
+- All four `http.test.js` tests must pass including the favicon assertion.
+- Socket.IO layer (step 6's territory) is not touched.
 
 ### Verification — two-stage
 
@@ -555,10 +655,12 @@ git revert HEAD --no-edit
 refactor(server): upgrade Express 3 → Express 4 (F-02,F-03,F-04,F-05,F-10)
 
 Removes app.configure() wrappers (removed in Express 4). Replaces
-express.favicon() → serve-favicon, express.logger() → morgan,
-express.errorHandler() → errorhandler. Middleware order preserved.
-Express 4 boots on Node 20 LTS. All 18 behavioral tests pass on
-Node 6 legacy runtime.
+express.logger() → morgan, express.errorHandler() → errorhandler.
+Drops express.favicon() — adds minimal public/favicon.ico instead so
+express.static serves it and GET /favicon.ico continues to return 200.
+All middleware inlined at module scope; app.set('port',...) remains at
+module scope before start(). Express 4 boots on Node 20 LTS.
+All 18 behavioral tests pass on Node 6 legacy runtime.
 ```
 
 ### Branch name
@@ -595,13 +697,36 @@ with an `ORIGIN` environment variable, defaulting to `*` in development.
 
 ### Files changed
 
+**Production files:**
+
 | File | Change |
 |---|---|
 | `server/index.js` | Remove `io.configure()`/`io.set()`; replace with Socket.IO 4 constructor `cors` option; update `socket.disconnect()` → `socket.disconnect(true)` |
 | `public/js/SocketController.js` | `io.connect('/')` → `io('/')` (deprecated in Socket.IO 3+) |
 | `package.json` | `"socket.io": "0.9.x"` → `"socket.io": "4.x"` |
-| `legacy/get24-baseline/tests/harness.js` | Update `socket.socket.connected` → `socket.connected`; replace Transport.websocket null-out with Socket.IO 4 transport restriction; update `socket.io-client` import path for v4 |
-| `legacy/get24-baseline/tests/xhr-shim.js` | Verify or update if Socket.IO 4 client's xhr transport no longer uses the `xmlhttprequest` module (may become a no-op shim) |
+
+**Test-harness files (compatibility updates only — not changes to the event contract):**
+
+These files contain internal Socket.IO 0.9 client implementation details that
+do not exist in Socket.IO 4. Updating them is a harness compatibility change: the
+*observable behavior being tested* (event names, payload keys, server responses)
+does not change — only the mechanism the test process uses to drive the client
+changes to match the new client API.
+
+| File | Change |
+|---|---|
+| `legacy/get24-baseline/tests/harness.js` | Replace `CLIENT_IO.Transport.websocket = null` with Socket.IO 4 transport restriction (`transports: ['polling']` connect option); update `socket.io-client` import path for v4 |
+| `legacy/get24-baseline/tests/socket.test.js` | Line 16: `a.socket.socket.connected` → `a.socket.connected` (Socket.IO 4 exposes `connected` directly on the socket, not on a nested `.socket` object) |
+| `legacy/get24-baseline/tests/game-events.test.js` | Line 198: `c.socket.socket.connected` → `c.socket.connected` (same reason as above) |
+| `legacy/get24-baseline/tests/xhr-shim.js` | Verify whether Socket.IO 4 client's polling transport still uses `xmlhttprequest` or uses the native `http` module. If unused, the shim becomes a no-op and the `require.cache` injection in `harness.js` can be removed. |
+
+**Important:** `socket.socket.connected` appears in two test files, not only in
+`harness.js`. Both must be updated. The property path changes from `socket.socket.connected`
+(0.9 client: namespace wrapped in outer socket object) to `socket.connected`
+(Socket.IO 4 client: flag is directly on the socket/namespace object).
+
+These changes do not alter the event contract table. The 10 event names and every
+payload key remain exactly as specified below.
 
 ### Exact changes
 
@@ -651,18 +776,25 @@ Remove the separate `var io = require('socket.io').listen(server);` line.
 +    "socket.io": "4.x",
 ```
 
-**`legacy/get24-baseline/tests/harness.js`** — Socket.IO 4 client API:
+**Test harness files** — Socket.IO 4 client API:
 
 The `socket.io-client` bundled inside `socket.io@4.x` is version 4.x. The import
 path, the transport restriction mechanism, and the `connected` flag location all
-change. The exact harness edits must be determined during execution by reading the
-Socket.IO 4 client API. The invariants the harness must still satisfy are:
+change. The exact edits must be determined during execution by reading the Socket.IO
+4 client API. The invariants all three test files must satisfy after the update are:
 
-- `socket.connected === true` after a successful connect (replaces `socket.socket.connected`)
-- Transport must be forced to polling to avoid the websocket Origin issue
-  (Socket.IO 4 uses `transports: ['polling']` in the connect options)
-- The `xmlhttprequest` shim may be unnecessary if Socket.IO 4's xhr transport
-  uses `node-fetch` or the native `http` module instead of `xmlhttprequest`
+- **`harness.js`**: Replace `CLIENT_IO.Transport.websocket = null` with
+  `transports: ['polling']` in the Socket.IO client connect options. This forces
+  polling and avoids the websocket Origin issue. Update the `socket.io-client`
+  import to the Socket.IO 4 client path.
+- **`socket.test.js` line 16**: Change `a.socket.socket.connected` → `a.socket.connected`.
+- **`game-events.test.js` line 198**: Change `c.socket.socket.connected` → `c.socket.connected`.
+- **`xhr-shim.js`**: Determine during execution whether Socket.IO 4 polling still
+  uses `xmlhttprequest`. If not, the `require.cache` injection and shim are removed.
+  If still needed, the shim is kept unchanged.
+
+These are test-harness compatibility changes. None of them change what the server
+emits or what the client sends — the event contract table below is unaffected.
 
 **Event contract — must not change:**
 
@@ -735,7 +867,7 @@ All 18 behavioral tests pass on Node 20 LTS.
 
 KineticJS 4.6.0 was abandoned in 2015. Its successor Konva.js is API-compatible
 for the operations used in `StageController.js` with two known breaking differences
-(`shadowOffset` format and `Tween` constructor property names). This step also
+(`shadowOffset` format and setter/getter method naming). This step also
 fixes two existing client-side bugs that were documented in the ASSESS:
 
 - **F-16**: `helpDialog.toggle()` references `layer` which is not defined in
@@ -745,19 +877,35 @@ fixes two existing client-side bugs that were documented in the ASSESS:
 
 This step is **client-only**: no file in `server/` or `index.js` is touched. The
 existing 18 tests do not cover client-side rendering. Their HTTP tests that assert
-the old filename `js/kinetic-v4.6.0.min.js` and the string `'Kinetic'` in the
-static file will fail unless the `http.test.js` assertions are updated as part of
-this same commit.
+the old filename `js/kinetic-v4.6.0.min.js` and the strings `'Kinetic'` in
+`StageController.js` and in the kinetic bundle will fail unless the `http.test.js`
+assertions are updated as part of this same commit.
+
+#### Pinned Konva.js version
+
+**Use Konva.js `9.3.18` (exact version — not "latest").**
+
+Rationale: `9.3.18` is the most recent release in the stable `9.x` line as of
+the time this plan was produced. The API mapping table below was verified against
+`9.3.18`. Konva `9.x` retains all constructors and methods used in
+`StageController.js`. Konva `10.x` (if released) may introduce further breaking
+changes and is not covered by this plan.
+
+The minified bundle to vendor is:
+`https://unpkg.com/konva@9.3.18/konva.min.js`
+
+Record the version in the commit message. Do not substitute a different version
+without re-verifying the API mapping table.
 
 ### Files changed
 
 | File | Change |
 |---|---|
-| `public/js/kinetic-v4.6.0.min.js` | Remove (or keep alongside for reference) |
-| `public/js/konva.min.js` | Add — Konva.js latest minified bundle |
+| `public/js/kinetic-v4.6.0.min.js` | Remove |
+| `public/js/konva.min.js` | Add — Konva.js `9.3.18` minified bundle (download from `https://unpkg.com/konva@9.3.18/konva.min.js`) |
 | `public/index.html` | Update script `src` from `kinetic-v4.6.0.min.js` to `konva.min.js` |
-| `public/js/StageController.js` | Update all KineticJS API calls for Konva.js compatibility; fix F-16 `layer` → `activeLayer`; fix F-17 `blink || true` → `blink !== false` |
-| `legacy/get24-baseline/tests/http.test.js` | Update filename and string assertions from KineticJS to Konva |
+| `public/js/StageController.js` | Update all KineticJS API calls for Konva.js `9.3.18` compatibility; fix F-16 `layer` → `activeLayer`; fix F-17 `blink || true` → `blink !== false` |
+| `legacy/get24-baseline/tests/http.test.js` | Update three assertions from KineticJS to Konva (details below) |
 
 ### Key API differences between KineticJS 4.6.0 and Konva.js
 
@@ -799,15 +947,46 @@ this same commit.
 
 ### http.test.js assertions to update
 
-`legacy/get24-baseline/tests/http.test.js` — `GET / serves every static asset` test:
+Three assertions in `legacy/get24-baseline/tests/http.test.js` must be updated in
+the Step 7 commit. All three are harness accuracy changes — they reflect the new
+filenames and global symbol; the observable server behaviors (200 status,
+`Content-Type: application/javascript`, non-zero byte count) remain identical.
+
+**Assertion 1** — `GET /` body content check (line 24):
+
+```diff
+-    'js/kinetic-v4.6.0.min.js',
++    'js/konva.min.js',
+```
+
+This checks that `index.html` references the script by filename. After Step 7
+`index.html` will reference `konva.min.js` instead.
+
+**Assertion 2** — static asset list, KineticJS bundle entry (line 41):
 
 ```diff
 -    ['/js/kinetic-v4.6.0.min.js', /javascript/, ['Kinetic']],
 +    ['/js/konva.min.js', /javascript/, ['Konva']],
 ```
 
-`GET /` content checks: the HTML comment `kinetic-v4.6.0.min.js` in `index.html`
-will change; update the assertion in `http.test.js` accordingly.
+This checks that the bundle is served and that its body contains the global symbol.
+After Step 7 the bundle is Konva.js; the global exported by `konva.min.js` is
+`Konva` (capital K, without the `tic` suffix).
+
+**Assertion 3** — static asset list, `StageController.js` content check (line 43):
+
+```diff
+-    ['/js/StageController.js', /javascript/, ['Kinetic']],
++    ['/js/StageController.js', /javascript/, ['Konva']],
+```
+
+This checks that `StageController.js` contains the canvas library's global name.
+After Step 7 all `Kinetic.` constructor references are replaced with `Konva.`,
+so the body will contain `'Konva'` but no longer `'Kinetic'`. This assertion was
+**missing from the original plan** and is included here.
+
+The fourth asset entry `['/favicon.ico', null, null]` is unchanged — it was
+already handled in Step 5.
 
 ### Behavior preserved
 
@@ -851,15 +1030,18 @@ git revert HEAD --no-edit
 ### Commit message template
 
 ```
-refactor(client): replace KineticJS 4.6 with Konva.js (F-16,F-17,F-20)
+refactor(client): replace KineticJS 4.6 with Konva.js 9.3.18 (F-16,F-17,F-20)
 
-Removes the abandoned KineticJS 4.6.0 bundle. Adds Konva.js (maintained
-fork of KineticJS). Updates all Kinetic.* constructors and method calls
-to Konva equivalents. Fixes shadowOffset array→object format. Fixes
-F-16: helpDialog.toggle() layer reference → activeLayer. Fixes F-17:
-blink||true → blink!==false so showRoundOver can suppress blinking.
-Updates http.test.js filename and string assertions. All 18 behavioral
-tests pass. Visual behavior manually verified in browser.
+Removes the abandoned KineticJS 4.6.0 bundle. Vendors Konva.js 9.3.18
+(https://unpkg.com/konva@9.3.18/konva.min.js). Updates all Kinetic.*
+constructors and method calls to Konva equivalents (9.3.18 API verified).
+Fixes shadowOffset array→object format. Fixes F-16: helpDialog.toggle()
+layer reference → activeLayer. Fixes F-17: blink||true → blink!==false
+so showRoundOver can suppress blinking.
+Updates http.test.js: (1) index.html filename assertion kinetic→konva,
+(2) bundle asset entry kinetic→konva + 'Kinetic'→'Konva',
+(3) StageController.js content assertion 'Kinetic'→'Konva'.
+All 18 behavioral tests pass. Visual behavior manually verified in browser.
 ```
 
 ### Branch name
@@ -873,12 +1055,12 @@ tests pass. Visual behavior manually verified in browser.
 | Step | Candidate | Finding(s) | Files | Risk | Verify target |
 |---|---|---|---|---|---|
 | 1 | F — type guard | F-18 | `server/game/index.js` | Negligible | 18/18 on Node 6 |
-| 2 | C — node-uuid → uuid | F-11 | `server/game/index.js`, `package.json` | Low | 18/18 on Node 6 |
-| 3 | D — node-expression-eval → expr-eval | F-12 | `server/game/index.js`, `package.json` | Medium | 18/18 on Node 6 |
+| 2 | C — node-uuid → uuid@9.0.1 | F-11 | `server/game/index.js`, `package.json` | Low | 18/18 on Node 6 (pre-check required) |
+| 3 | D — node-expression-eval → expr-eval@2 | F-12 | `server/game/index.js`, `package.json` | Medium | 18/18 on Node 6 |
 | 4 | E — server start decouple | F-13 | `server/index.js`, `index.js` | Low-Medium | 18/18 on Node 6 |
-| 5 | A — Express 3 → 4 | F-02,F-03,F-04,F-05,F-10 | `server/index.js`, `package.json` | Medium | 18/18 on Node 6 + boot on Node 20 |
-| 6 | B — Socket.IO 0.9 → 4 | F-06,F-07,F-08,F-09,F-21 | `server/index.js`, `public/js/SocketController.js`, `package.json`, harness | High | 18/18 on Node 20 |
-| 7 | G — KineticJS → Konva | F-16,F-17,F-20 | `public/js/*`, `public/index.html`, `http.test.js` | Medium-High | 18/18 on Node 20 + browser |
+| 5 | A — Express 3 → 4 | F-02,F-03,F-04,F-05,F-10 | `server/index.js`, `package.json`, `public/favicon.ico` (new) | Medium | 18/18 on Node 6 + boot on Node 20 |
+| 6 | B — Socket.IO 0.9 → 4 | F-06,F-07,F-08,F-09,F-21 | `server/index.js`, `SocketController.js`, `package.json`, `harness.js`, `socket.test.js`, `game-events.test.js` | High | 18/18 on Node 20 |
+| 7 | G — KineticJS → Konva.js 9.3.18 | F-16,F-17,F-20 | `public/js/*`, `public/index.html`, `http.test.js` (3 assertions) | Medium-High | 18/18 on Node 20 + browser |
 
 ---
 
