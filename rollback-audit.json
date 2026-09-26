@@ -1,0 +1,99 @@
+[
+  {
+    "timestamp": "2026-09-26T15:56:06.207Z",
+    "trigger": "FAIL",
+    "targetCommit": "3889bec2b6b445c267efab943d4fe89f6d08e7a2",
+    "revertCommit": null,
+    "dryRun": true,
+    "postValidation": null,
+    "outcome": "DRY_RUN"
+  },
+  {
+    "timestamp": "2026-09-26T15:56:58.875Z",
+    "trigger": "FAIL",
+    "targetCommit": "dcc233f274cba6e4ece0db88a013f2c6669012df",
+    "revertCommit": "4f2620040ec0944384a824c4f6a7325b9cf1eadd",
+    "dryRun": false,
+    "postValidation": {
+      "timestamp": "2026-09-26T15:56:31.556Z",
+      "node": "v24.21.0",
+      "commit": "dcc233f274cba6e4ece0db88a013f2c6669012df",
+      "branch": "samrudhi/validation-rollback",
+      "passed": 17,
+      "failed": 1,
+      "skipped": 0,
+      "total": 18,
+      "exitStatus": 1,
+      "status": "FAIL",
+      "suites": [
+        {
+          "name": "http",
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "exitCode": 0
+        },
+        {
+          "name": "socket",
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "exitCode": 0
+        },
+        {
+          "name": "game-events",
+          "passed": 9,
+          "failed": 1,
+          "skipped": 0,
+          "exitCode": 1
+        }
+      ],
+      "rawOutput": "# Get24 legacy HTTP behavior (real Express 3.0.6 server)\nok 1 - GET / serves the Get24 application page  (675ms)\nok 2 - GET / serves every static asset the page references  (900ms)\nok 3 - GET /socket.io/socket.io.js serves the Socket.IO 0.9 client build  (704ms)\nok 4 - GET / returns 404 for an unknown path  (619ms)\n# 4 tests, 4 passed, 0 failed, 0 skipped\n\n# Get24 legacy Socket.IO connection + join (real socket.io 0.9.19 server)\nok 1 - a Socket.IO client completes the handshake and connects  (742ms)\nok 2 - server emits connected with an incrementing numUsers count  (681ms)\nok 3 - first player receives gameJoined with a uuid room, a real card and numPlayers 1  (638ms)\nok 4 - the round timer starts ticking for the first player  (1655ms)\n# 4 tests, 4 passed, 0 failed, 0 skipped\n\n[stderr] (node:41824) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n\n# Get24 legacy game events (real socket.io 0.9.19 server)\nok 1 - a second player joins the same game and the first player is told  (748ms)\nok 2 - a valid non-winning expression produces evaluatedExpr and no roundOver  (1242ms)\nnot ok 3 - a missing card digit produces invalidExpr \"Must use all 4 digits.\"\n  AssertionError [ERR_ASSERTION]: invalidExpr payload\n      at C:\\Users\\wind10\\Codexmatrix-IBM-Bob-Hackathon\\legacy\\get24-baseline\\tests\\game-events.test.js:76:11\nok 4 - an illegal character produces invalidExpr \"Legal operators are ...\"  (668ms)\nok 5 - combined digits produce invalidExpr \"Digits can't be combined.\"  (671ms)\nok 6 - an unparseable but legal-character expression produces invalidExpr \"Invalid.\"  (617ms)\nok 7 - a winning expression ends the round: win for the winner, loss for the other player  (684ms)\nok 8 - a player disconnect produces playerQuit for the remaining player  (701ms)\nok 9 - timer expiration ends the round with type timer and a new card  (3661ms)\nok 10 - a connection past maxConnections is rejected: no connected, no gameJoined, disconnect  (701ms)\n# 10 tests, 9 passed, 1 failed, 0 skipped\n\n[stderr] (node:50648) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n"
+    },
+    "outcome": "ROLLBACK_FAILED"
+  },
+  {
+    "timestamp": "2026-09-26T15:58:02.986Z",
+    "trigger": "FAIL",
+    "targetCommit": "b4aea514805a9e610ea3180defbccdd62614ed54",
+    "revertCommit": "c9c13f7d0bb7822de9861ee8fd48b30bea4be1d3",
+    "dryRun": false,
+    "postValidation": {
+      "timestamp": "2026-09-26T15:58:04.041Z",
+      "node": "v24.21.0",
+      "commit": "c9c13f7d0bb7822de9861ee8fd48b30bea4be1d3",
+      "branch": "samrudhi/validation-rollback",
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "total": 18,
+      "exitStatus": 0,
+      "status": "PASS",
+      "suites": [
+        {
+          "name": "http",
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "exitCode": 0
+        },
+        {
+          "name": "socket",
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "exitCode": 0
+        },
+        {
+          "name": "game-events",
+          "passed": 10,
+          "failed": 0,
+          "skipped": 0,
+          "exitCode": 0
+        }
+      ],
+      "rawOutput": "# Get24 legacy HTTP behavior (real Express 3.0.6 server)\nok 1 - GET / serves the Get24 application page  (612ms)\nok 2 - GET / serves every static asset the page references  (621ms)\nok 3 - GET /socket.io/socket.io.js serves the Socket.IO 0.9 client build  (876ms)\nok 4 - GET / returns 404 for an unknown path  (607ms)\n# 4 tests, 4 passed, 0 failed, 0 skipped\n\n# Get24 legacy Socket.IO connection + join (real socket.io 0.9.19 server)\nok 1 - a Socket.IO client completes the handshake and connects  (1006ms)\nok 2 - server emits connected with an incrementing numUsers count  (683ms)\nok 3 - first player receives gameJoined with a uuid room, a real card and numPlayers 1  (666ms)\nok 4 - the round timer starts ticking for the first player  (1958ms)\n# 4 tests, 4 passed, 0 failed, 0 skipped\n\n[stderr] (node:43404) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n\n# Get24 legacy game events (real socket.io 0.9.19 server)\nok 1 - a second player joins the same game and the first player is told  (731ms)\nok 2 - a valid non-winning expression produces evaluatedExpr and no roundOver  (1219ms)\nok 3 - a missing card digit produces invalidExpr \"Must use all 4 digits.\"  (628ms)\nok 4 - an illegal character produces invalidExpr \"Legal operators are ...\"  (656ms)\nok 5 - combined digits produce invalidExpr \"Digits can't be combined.\"  (677ms)\nok 6 - an unparseable but legal-character expression produces invalidExpr \"Invalid.\"  (633ms)\nok 7 - a winning expression ends the round: win for the winner, loss for the other player  (751ms)\nok 8 - a player disconnect produces playerQuit for the remaining player  (861ms)\nok 9 - timer expiration ends the round with type timer and a new card  (3690ms)\nok 10 - a connection past maxConnections is rejected: no connected, no gameJoined, disconnect  (508ms)\n# 10 tests, 10 passed, 0 failed, 0 skipped\n\n[stderr] (node:49148) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n"
+    },
+    "outcome": "ROLLBACK_OK"
+  }
+]

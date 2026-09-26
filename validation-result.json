@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-09-26T15:58:04.041Z",
+  "node": "v24.21.0",
+  "commit": "c9c13f7d0bb7822de9861ee8fd48b30bea4be1d3",
+  "branch": "samrudhi/validation-rollback",
+  "passed": 18,
+  "failed": 0,
+  "skipped": 0,
+  "total": 18,
+  "exitStatus": 0,
+  "status": "PASS",
+  "suites": [
+    {
+      "name": "http",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    {
+      "name": "socket",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    {
+      "name": "game-events",
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0
+    }
+  ],
+  "rawOutput": "# Get24 legacy HTTP behavior (real Express 3.0.6 server)\nok 1 - GET / serves the Get24 application page  (612ms)\nok 2 - GET / serves every static asset the page references  (621ms)\nok 3 - GET /socket.io/socket.io.js serves the Socket.IO 0.9 client build  (876ms)\nok 4 - GET / returns 404 for an unknown path  (607ms)\n# 4 tests, 4 passed, 0 failed, 0 skipped\n\n# Get24 legacy Socket.IO connection + join (real socket.io 0.9.19 server)\nok 1 - a Socket.IO client completes the handshake and connects  (1006ms)\nok 2 - server emits connected with an incrementing numUsers count  (683ms)\nok 3 - first player receives gameJoined with a uuid room, a real card and numPlayers 1  (666ms)\nok 4 - the round timer starts ticking for the first player  (1958ms)\n# 4 tests, 4 passed, 0 failed, 0 skipped\n\n[stderr] (node:43404) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n\n# Get24 legacy game events (real socket.io 0.9.19 server)\nok 1 - a second player joins the same game and the first player is told  (731ms)\nok 2 - a valid non-winning expression produces evaluatedExpr and no roundOver  (1219ms)\nok 3 - a missing card digit produces invalidExpr \"Must use all 4 digits.\"  (628ms)\nok 4 - an illegal character produces invalidExpr \"Legal operators are ...\"  (656ms)\nok 5 - combined digits produce invalidExpr \"Digits can't be combined.\"  (677ms)\nok 6 - an unparseable but legal-character expression produces invalidExpr \"Invalid.\"  (633ms)\nok 7 - a winning expression ends the round: win for the winner, loss for the other player  (751ms)\nok 8 - a player disconnect produces playerQuit for the remaining player  (861ms)\nok 9 - timer expiration ends the round with type timer and a new card  (3690ms)\nok 10 - a connection past maxConnections is rejected: no connected, no gameJoined, disconnect  (508ms)\n# 10 tests, 10 passed, 0 failed, 0 skipped\n\n[stderr] (node:49148) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n"
+}
