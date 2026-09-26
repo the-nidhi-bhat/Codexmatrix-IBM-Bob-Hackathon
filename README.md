@@ -1,86 +1,92 @@
-Get24
-=====
-Get24 is a competetive real-time multiplayer math game that I wrote as a Spring
-2013 semester project for a game development course at Auburn University. Check
-out the [**live demo**][get24] running currently on a cloud instance from my
-good friends at [**Nodejitsu**][nodejitsu]!
+# Legacy Code Whisperer
 
-Dependencies
-------------
-Get24 was built on Ubuntu Linux using nothing but open source software and 
-libaries. The back-end was developed in [**Node.JS**][nodejs] and has the
-following dependencies:
+**Team:** Codexmatrix
 
-* [**Express 3**][express]
-    - Popular web application framework for Node.JS similar to Sinatra.
-* [**Socket.IO**][socketio]
-    - Websocket API for real-time networking, includes fallbacks to use Flash,
-    long-polling, etc, if Websockets are not available.
-* [**Javascript Expression Evaluator**][js-expr-eval]
-    - Arithmetical expression evaluator/parser written in JavaScript.
-* [**node-uuid**][node-uuid]
-    - Node module for creating both random and time based UUIDs.
+**Event:** IBM Bob 2.0 Hackathon
 
-The client is a simple HTML web app which uses only the following:
+Legacy Code Whisperer is a safety-first developer workflow for modernizing legacy applications with IBM Bob.
 
-* [**KineticJS**][kineticjs]
-    - Framework for abstracting the HTML5 Canvas API. Offers simplified drawing,
-    buffering, layering, grouping, animations, etc.
+> Legacy Code Whisperer does not blindly modify legacy code. It first protects existing behavior with tests, makes modernization changes incrementally, verifies every change, and rolls back when a regression is detected.
 
-Concept
--------
-Get24 is based on the [**24 Game**][24-game]. I enjoyed playing the card game
-in my fifth grade classroom with my favorite grade school teacher. The card
-game comes with a deck of cards each with four numbers on the face (1-9). There
-are easy, medium, and difficult cards. The object of the game is for players
-to attempt to manipulate the four numbers shown in an arithmetical expression
-which evaluates to 24. The following image shows a sample card from the 24 game
-which has a possible solution of `4*(4+1+1)`.
+The product is currently at the foundation stage. The concept, workflow, and team responsibilities are defined; the legacy application and product implementation are not yet present.
 
-[![Sample 24 Game Card][24-game-card]][24-game]
+## Core workflow
 
-Description
------------
-The game consists of multiple players being shown the same set of four digits
-`(0-9)` and are put on a timer. The first player that can craft an arithmetical
-expression using all four of the digits once and only once is the winner.
-Players may use the four basic arithemtical operators (along with parenthesis
-to force precedence) in their expressions `(+ - * /)` and may use some of them
-more than once or not at all.
+The planned workflow is:
 
-Here is a [**YouTube video**][demo-video] of testing being done on the server
-and game client during development.
+**Understand → Protect → Assess → Plan → Execute → Verify → Rollback → Recover → Report**
 
-Build
------
-In order to build the project, you'll need to have both [**Git**][git] and 
-[**Node.JS**][nodejs] installed.
+These phases describe the intended safety process. They are not all implemented yet.
 
-Clone the GitHub repository with the following:
+| Phase | Intended purpose |
+|---|---|
+| **Understand** | Inspect the legacy repository, its behavior, and its dependencies before changing anything. |
+| **Protect** | Capture existing behavior with tests so it can be checked after changes. |
+| **Assess** | Identify the risk and change surface of a proposed modernization. |
+| **Plan** | Define small, incremental modernization steps. |
+| **Execute** | Apply controlled changes to the legacy codebase. |
+| **Verify** | Run the relevant checks and tests after each change. |
+| **Rollback** | Revert a change when verification detects a regression. |
+| **Recover** | Restore a safe, understandable state after a failed change. |
+| **Report** | Record the change, evidence, and outcome. |
 
-    $   git clone https://github.com/CoryG89/Get24
+## Team responsibilities
 
-Change to the new repository directory, use `npm` to install the dependencies
-and start the server.
+| Team member | Responsibility |
+|---|---|
+| **Nidhi** | Technical lead |
+| **Arati** | Documentation |
+| **Iffa** | Frontend/UI |
+| **Samrudhi** | Testing |
 
-    $   cd Get24
-    $   npm install
-    $   npm start
+## IBM Bob
 
-The server runs on port 3001 by default so you may access it in your browser by
-pointing it to the loopback address via the hostname 'localhost' via:
-    
-	http://localhost:3001/
+IBM Bob is intended to be a core part of the final solution. Potential Bob responsibilities include:
 
-[get24]: http://get24.jit.su/
-[nodejitsu]: http://nodejitsu.com/
-[nodejs]: http://nodejs.org/
-[express]: http://expressjs.com/
-[socketio]: http://socket.io/
-[js-expr-eval]: http://silentmatt.com/javascript-expression-evaluator/
-[kineticjs]: http://kineticjs.com/
-[demo-video]: http://youtu.be/gwTesvqwFWo
-[git]: http://git-scm.org
+- Legacy repository understanding
+- Behavioral test generation
+- Modernization assessment
+- Modernization planning
+- Controlled code changes
+- Verification
+- Regression investigation
+- Safer alternatives
 
-[24-game]: https://en.wikipedia.org/wiki/24_Game
-[24-game-card]: https://upload.wikimedia.org/wikipedia/en/2/23/Sample_24_card.jpg
+These are planned responsibilities, not capabilities that are already implemented or measured.
+
+## OpenCode
+
+OpenCode is Nidhi's personal development tool and is separate from IBM Bob. Work performed with OpenCode is not recorded as an IBM Bob contribution.
+
+## Current status
+
+The repository is in the foundation stage:
+
+- Project concept locked: **Legacy Code Whisperer**
+- Safety workflow locked
+- Team roles defined
+- Repository initialized and connected to GitHub
+- IBM Bob documentation established in `IBM_BOB/`
+- Legacy application not yet imported
+- Product implementation not yet started
+- No product dependencies installed
+
+## Documentation and evidence
+
+- `IBM_BOB/` is the only location for IBM Bob documentation and records.
+- `bob_sessions/` is the planned location for official IBM Bob session evidence when actual evidence is produced. It has not been created yet.
+- The local `.opencode/` directory is Nidhi's personal tooling, not IBM Bob documentation or product source.
+
+## Repository structure
+
+```text
+IBM-Bob-Hackathon/
+├── IBM_BOB/               # IBM Bob documentation and records
+│   ├── BOB_USAGE.md
+│   ├── BOB_CHANGES.md
+│   └── BOB_PROMPTS.md
+├── .gitignore             # Protects secrets, env files, and build artifacts
+└── README.md              # This file
+```
+
+*IBM Bob 2.0 Hackathon — Team Codexmatrix*
