@@ -101,3 +101,104 @@ The Rollback screen is the highlight of the demo — clicking "▶ Start Demo" t
 ### Status
 
 ✅ Completed — 0 TypeScript errors, production build passes, dev server live at http://localhost:5173
+
+---
+
+## Entry 004 — Workflow State Refactor: Shared Typed Execution State
+
+**Date:** 2025-09-26  
+**Branch:** `iffa/ui-repo-entry`  
+**Task:** Connect all workflow screens to a shared typed WorkflowState via React context  
+**Triggered by:** User prompt to replace scattered mock data imports with a clean data/UI boundary
+
+### What IBM Bob did
+
+1. Inspected all existing screen files and `mockData.ts` to map current data dependencies
+2. Designed a typed domain model (`types.ts`) covering the entire 9-phase workflow
+3. Built `mockWorkflow.ts` — the single source of mock data (2 verification scenarios: PASS 18/0/0, FAIL 16/2/0)
+4. Built `WorkflowContext.tsx` — React context + `WorkflowProvider` + `useWorkflow` hook
+5. Updated all 7 screens to consume `useWorkflow()` instead of importing `mockData.ts` directly
+6. Updated `App.tsx` to wrap the dashboard in `WorkflowProvider` and derive header/sidebar values from state
+7. Ran `tsc --noEmit` (0 errors), `npm run build` (clean), dev server confirmed 200
+8. Committed and pushed to `iffa/ui-repo-entry`
+
+### Files created/modified
+
+| File | Action |
+|------|--------|
+| `frontend/src/workflow/types.ts` | Created — typed domain model |
+| `frontend/src/workflow/mockWorkflow.ts` | Created — mock WorkflowState factory |
+| `frontend/src/workflow/WorkflowContext.tsx` | Created — React context + provider |
+| `frontend/src/App.tsx` | Modified — WorkflowProvider wrapper, context-driven header |
+| `frontend/src/screens/OverviewScreen.tsx` | Modified — useWorkflow |
+| `frontend/src/screens/RiskScreen.tsx` | Modified — useWorkflow |
+| `frontend/src/screens/PlanScreen.tsx` | Modified — useWorkflow, new StepStatus values |
+| `frontend/src/screens/ExecutionScreen.tsx` | Modified — useWorkflow |
+| `frontend/src/screens/VerificationScreen.tsx` | Modified — useWorkflow, PASS/FAIL toggle |
+| `frontend/src/screens/RollbackScreen.tsx` | Modified — useWorkflow, commit hashes, recovery status |
+| `frontend/src/screens/ReportScreen.tsx` | Modified — useWorkflow |
+
+### Commit
+
+`1444c56` — pushed to `origin/iffa/ui-repo-entry`
+
+### Status
+
+✅ Completed — 0 TypeScript errors · production build clean · dev server 200
+
+---
+
+## Entry 005 — Real Backend Integration: Live Repository Analysis
+
+**Date:** 2025-09-27  
+**Branch:** `iffa/ui-repo-entry`  
+**Task:** Replace mock data with a real Express backend that clones and analyzes GitHub repositories  
+**Triggered by:** User prompt to build a real backend and wire it to the existing frontend
+
+### What IBM Bob did
+
+1. **Inspected** all existing frontend files — `WorkflowContext.tsx`, `App.tsx`, `StartScreen.tsx`, `types.ts`, `vite.config.ts` — to understand the exact integration points before writing a single line
+2. **Designed** the full backend architecture: Express + TypeScript, `POST /api/analyze`, `GET /api/runs/:runId`, `GET /api/health`, in-memory run store (50-run LRU eviction)
+3. **Created** `backend/src/types.ts` — typed backend `WorkflowState` that mirrors the frontend domain model exactly
+4. **Created** `backend/src/analyzer.ts` — real git clone via child_process (`git clone --depth 1`), language/framework detection (package.json parsing, file glob scanning), risk assessment engine, incremental plan generator, full audit trail
+5. **Created** `backend/src/routes/analyze.ts` — REST route handlers with typed request/response envelopes and structured error codes (`INVALID_URL`, `REPOSITORY_NOT_FOUND`, `CLONE_TIMEOUT`, `ANALYSIS_FAILED`)
+6. **Created** `backend/src/index.ts` — Express server on port 3001 with CORS
+7. **Created** `tools/validate.js` and `tools/rollback.js` — adapter stubs for future integration
+8. **Created** `frontend/src/api/workflowApi.ts` — typed API client with `analyzeRepository()`, `getRun()`, and `WorkflowApiError` class (structured error with code, phase, httpStatus)
+9. **Updated** `frontend/vite.config.ts` — added `/api` proxy to `http://localhost:3001` for seamless dev-server usage
+10. **Refactored** `frontend/src/workflow/WorkflowContext.tsx` — removed `buildMockWorkflowState` dependency; provider now accepts a pre-fetched `WorkflowState` as a prop (clean data/UI boundary)
+11. **Refactored** `frontend/src/App.tsx` — introduced a 4-state `AppPhase` machine (`start → loading → error | dashboard`); calls `analyzeRepository()` on submit; passes real state to `WorkflowProvider`; never falls back to mock data silently
+12. **Updated** `frontend/src/screens/StartScreen.tsx` — added loading state (animated dot indicator, disabled controls, progress message), backend error display with error code badge, `defaultUrl` prop for pre-filling after errors; removed the "DEMO — no backend" disclaimer
+13. **Verified** `backend npx tsc --noEmit` → 0 errors
+14. **Verified** `frontend npx tsc --noEmit` → 0 errors
+15. **Verified** `frontend npm run build` → clean in 264ms, 0 warnings
+16. **Smoke-tested** backend health endpoint → `{"ok": true, "runs": 0}`
+
+### Files created/modified
+
+| File | Action |
+|------|--------|
+| `backend/package.json` | Created — Express, cors, uuid, ts-node-dev, TypeScript |
+| `backend/tsconfig.json` | Created |
+| `backend/src/index.ts` | Created — Express server port 3001 |
+| `backend/src/types.ts` | Created — backend WorkflowState types |
+| `backend/src/analyzer.ts` | Created — git clone + real repo analysis |
+| `backend/src/routes/analyze.ts` | Created — REST API routes |
+| `tools/validate.js` | Created — validation adapter stub |
+| `tools/rollback.js` | Created — rollback adapter stub |
+| `frontend/src/api/workflowApi.ts` | Created — typed API client |
+| `frontend/vite.config.ts` | Modified — added /api proxy |
+| `frontend/src/workflow/WorkflowContext.tsx` | Modified — accepts `state` prop, removed mock dependency |
+| `frontend/src/App.tsx` | Modified — AppPhase state machine, real API call |
+| `frontend/src/screens/StartScreen.tsx` | Modified — loading/error UX, removed demo disclaimer |
+
+### Key design decisions
+
+- **No silent mock fallback** — if the backend fails, the UI shows the exact error message and code. The user always knows what happened.
+- **Clean data/UI boundary** — `WorkflowProvider` accepts `state` as a prop; it has no knowledge of how state was fetched. Switching from mock to real data required zero changes to any screen component.
+- **Lazy import of API client** — `workflowApi.ts` is dynamic-imported in `App.tsx` so it's code-split into its own chunk in the production bundle.
+- **`WorkflowApiError` class** — carries `code`, `phase`, and `httpStatus` so the UI can display structured error information matching the backend's error envelope format.
+
+### Status
+
+✅ Completed — backend tsc 0 errors · frontend tsc 0 errors · production build clean (264ms) · health endpoint confirmed live

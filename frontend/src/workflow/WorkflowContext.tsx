@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { WorkflowContextValue, WorkflowState, VerificationRun } from "./types";
-import { buildMockWorkflowState } from "./mockWorkflow";
 
 // ── Context ──────────────────────────────────────────────────────────────────
 
@@ -23,22 +22,16 @@ export function useWorkflow(): WorkflowContextValue {
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 interface WorkflowProviderProps {
-  /** Repository URL entered by the user on the Start screen. */
-  repoUrl: string;
+  /** Pre-fetched workflow state from the backend (or mock). */
+  state: WorkflowState;
   children: ReactNode;
 }
 
 /**
  * Wraps the dashboard. Provides a single WorkflowState to all screens.
- *
- * In demo mode: builds the state from mockWorkflow.ts using the supplied repoUrl.
- * In production: replace buildMockWorkflowState() with a real data source.
+ * The state is owned by App (fetched from backend) and passed in as a prop.
  */
-export function WorkflowProvider({ repoUrl, children }: WorkflowProviderProps) {
-  // Build the workflow state once per session (repoUrl is fixed after Start).
-  // In production this would come from an API/subscription.
-  const [state] = useState<WorkflowState>(() => buildMockWorkflowState(repoUrl));
-
+export function WorkflowProvider({ state, children }: WorkflowProviderProps) {
   const [verificationMode, setVerificationMode] = useState<"pass" | "fail">("fail");
 
   const activeVerification: VerificationRun = state.verification[verificationMode];

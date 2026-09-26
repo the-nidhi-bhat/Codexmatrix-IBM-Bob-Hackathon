@@ -1,7 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface StartScreenProps {
   onStart: (repoUrl: string) => void;
+  /** When true, the form is locked and a loading indicator is shown. */
+  loading?: boolean;
+  /** Pre-fill the URL input (e.g. when re-showing after an error). */
+  defaultUrl?: string;
+  /** The URL currently being analyzed (shown in the loading state). */
+  repoUrl?: string;
+  /** Backend error message to display (clears when user edits the input). */
+  errorMessage?: string;
+  /** Backend error code for display. */
+  errorCode?: string;
 }
 
 const EXAMPLE_REPOS = [
@@ -30,28 +40,55 @@ const PROCESS_STEPS = [
   { label: "Recover if needed",  detail: "Auto rollback on regression" },
 ];
 
-export default function StartScreen({ onStart }: StartScreenProps) {
-  const [url, setUrl] = useState("");
-  const [error, setError] = useState("");
+// Simple CSS-in-JS dot animation — no keyframe injection needed
+const DOT_FRAMES = ["Analyzing .", "Analyzing ..", "Analyzing ..."];
+
+export default function StartScreen({
+  onStart,
+  loading = false,
+  defaultUrl,
+  repoUrl: analyzingUrl,
+  errorMessage,
+  errorCode,
+}: StartScreenProps) {
+  const [url, setUrl] = useState(defaultUrl ?? "");
+  const [localError, setLocalError] = useState("");
+  const [dotFrame, setDotFrame] = useState(0);
+
+  // Keep url in sync if a defaultUrl arrives (e.g. after error reset)
+  useEffect(() => {
+    if (defaultUrl !== undefined) setUrl(defaultUrl);
+  }, [defaultUrl]);
+
+  // Animate the loading dots
+  useEffect(() => {
+    if (!loading) return;
+    const id = setInterval(() => setDotFrame((f) => (f + 1) % DOT_FRAMES.length), 500);
+    return () => clearInterval(id);
+  }, [loading]);
+
+  const displayError = localError || errorMessage || "";
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     const trimmed = url.trim();
     if (!trimmed) {
-      setError("Repository URL is required.");
+      setLocalError("Repository URL is required.");
       return;
     }
     if (!trimmed.startsWith("https://github.com/") && !trimmed.startsWith("http://")) {
-      setError("Enter a valid GitHub URL — https://github.com/owner/repo");
+      setLocalError("Enter a valid GitHub URL — https://github.com/owner/repo");
       return;
     }
-    setError("");
+    setLocalError("");
     onStart(trimmed);
   }
 
   function useExample(repo: string) {
+    if (loading) return;
     setUrl(repo);
-    setError("");
+    setLocalError("");
   }
 
   return (
@@ -148,10 +185,11 @@ export default function StartScreen({ onStart }: StartScreenProps) {
             <div
               style={{
                 background: "var(--surface)",
-                border: "1px solid var(--border)",
+                border: `1px solid ${loading ? "var(--accent)" : "var(--border)"}`,
                 borderRadius: 6,
                 overflow: "hidden",
                 marginBottom: 16,
+                transition: "border-color 0.2s",
               }}
             >
               <div
@@ -165,6 +203,19 @@ export default function StartScreen({ onStart }: StartScreenProps) {
                 }}
               >
                 <span style={{ color: "var(--muted)", fontSize: 13 }}>Repository to modernize</span>
+                {loading && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--accent)",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {DOT_FRAMES[dotFrame]}
+                  </span>
+                )}
               </div>
               <div style={{ padding: "16px" }}>
                 <label
@@ -183,85 +234,114 @@ export default function StartScreen({ onStart }: StartScreenProps) {
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     type="text"
-                    value={url}
-                    autoFocus
-                    onChange={(e) => { setUrl(e.target.value); setError(""); }}
+                    value={loading ? (analyzingUrl ?? url) : url}
+                    autoFocus={!loading}
+                    disabled={loading}
+                    onChange={(e) => { setUrl(e.target.value); setLocalError(""); }}
                     placeholder="https://github.com/owner/legacy-repo"
                     style={{
                       flex: 1,
                       padding: "9px 12px",
-                      background: "var(--bg)",
-                      border: `1px solid ${error ? "var(--red)" : "var(--border)"}`,
+                      background: loading ? "var(--surface-2)" : "var(--bg)",
+                      border: `1px solid ${displayError ? "var(--red)" : "var(--border)"}`,
                       borderRadius: 4,
-                      color: "var(--text)",
+                      color: loading ? "var(--muted)" : "var(--text)",
                       fontSize: 14,
                       outline: "none",
                       fontFamily: "inherit",
+                      cursor: loading ? "not-allowed" : "text",
                     }}
                   />
                   <button
                     type="submit"
+                    disabled={loading}
                     style={{
                       padding: "9px 20px",
-                      background: "var(--accent)",
-                      color: "#fff",
+                      background: loading ? "var(--surface-2)" : "var(--accent)",
+                      color: loading ? "var(--muted)" : "#fff",
                       border: "none",
                       borderRadius: 4,
                       fontSize: 13,
                       fontWeight: 600,
-                      cursor: "pointer",
+                      cursor: loading ? "not-allowed" : "pointer",
                       whiteSpace: "nowrap",
                       letterSpacing: "0.01em",
+                      transition: "background 0.2s",
                     }}
                   >
-                    Analyze Repository →
+                    {loading ? "Analyzing…" : "Analyze Repository →"}
                   </button>
                 </div>
-                {error && (
-                  <div style={{ color: "var(--red)", fontSize: 12, marginTop: 7 }}>{error}</div>
+
+                {/* Error message — either local validation or backend error */}
+                {displayError && (
+                  <div
+                    style={{
+                      color: "var(--red)",
+                      fontSize: 12,
+                      marginTop: 7,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ flexShrink: 0 }}>✖</span>
+                    <span>
+                      {displayError}
+                      {errorCode && !localError && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            fontFamily: "monospace",
+                            fontSize: 11,
+                            opacity: 0.7,
+                          }}
+                        >
+                          [{errorCode}]
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Loading detail */}
+                {loading && !displayError && (
+                  <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 7, lineHeight: 1.6 }}>
+                    Cloning repository and running analysis — this may take up to 60 seconds for large repos.
+                  </div>
                 )}
 
                 {/* Examples */}
-                <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0 }}>Try:</span>
-                  {EXAMPLE_REPOS.map((repo) => {
-                    const short = repo.replace("https://github.com/", "");
-                    return (
-                      <button
-                        key={repo}
-                        type="button"
-                        onClick={() => useExample(repo)}
-                        className="mono"
-                        style={{
-                          background: "transparent",
-                          border: "1px solid var(--border)",
-                          borderRadius: 3,
-                          color: "var(--accent)",
-                          fontSize: 11,
-                          padding: "2px 8px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {short}
-                      </button>
-                    );
-                  })}
-                </div>
+                {!loading && (
+                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0 }}>Try:</span>
+                    {EXAMPLE_REPOS.map((repo) => {
+                      const short = repo.replace("https://github.com/", "");
+                      return (
+                        <button
+                          key={repo}
+                          type="button"
+                          onClick={() => useExample(repo)}
+                          className="mono"
+                          style={{
+                            background: "transparent",
+                            border: "1px solid var(--border)",
+                            borderRadius: 3,
+                            color: "var(--accent)",
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </form>
-
-          {/* Demo notice — inline, not a card */}
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-            <span style={{ color: "var(--yellow)", fontSize: 11, fontWeight: 700, flexShrink: 0, paddingTop: 1 }}>
-              DEMO
-            </span>
-            <p style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-              No repository is cloned or analyzed. The dashboard loads mock data representing a
-              realistic Node.js modernization session. Backend integration is not implemented in
-              this milestone.
-            </p>
-          </div>
 
           {/* ── Process strip ─────────────────────────────────── */}
           <div style={{ marginTop: 48, borderTop: "1px solid var(--border)", paddingTop: 28 }}>
