@@ -1,5 +1,6 @@
 import { useState } from "react";
 import StartScreen from "./screens/StartScreen";
+import ArchitectureScreen from "./screens/ArchitectureScreen";
 import OverviewScreen from "./screens/OverviewScreen";
 import RiskScreen from "./screens/RiskScreen";
 import PlanScreen from "./screens/PlanScreen";
@@ -10,7 +11,7 @@ import ReportScreen from "./screens/ReportScreen";
 import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
 import "./App.css";
 
-type Screen = "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
+type Screen = "architecture" | "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
 
 interface NavItem {
   id: Screen;
@@ -21,6 +22,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  { id: "architecture",   label: "Architecture",   icon: "⬡" },
   { id: "overview",      label: "Overview",      icon: "◈" },
   { id: "risk",          label: "Risk",           icon: "⚠", badge: "2 high", badgeColor: "var(--red)" },
   { id: "plan",          label: "Plan",           icon: "☰", badge: "3→",     badgeColor: "var(--yellow)" },
@@ -31,6 +33,7 @@ const NAV: NavItem[] = [
 ];
 
 const PHASE_LABELS: Record<Screen, string> = {
+  architecture:  "Understand",
   overview:     "Understand · Protect",
   risk:         "Assess",
   plan:         "Plan",
@@ -225,6 +228,7 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
 
         {/* Main content */}
         <main style={{ flex: 1, padding: "28px 40px", minWidth: 0, maxWidth: 1400 }}>
+          {active === "architecture"  && <ArchitectureScreen />}
           {active === "overview"     && <OverviewScreen repoUrl={repoUrl} />}
           {active === "risk"         && <RiskScreen />}
           {active === "plan"         && <PlanScreen />}
