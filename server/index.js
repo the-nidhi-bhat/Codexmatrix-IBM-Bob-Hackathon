@@ -89,7 +89,7 @@ io.sockets.on('connection', function (socket) {
 	If client is accepted, true is returned. False is returned otherwise. */
 function accept(socket) {
     if (maxConnections === 0 || numConnections < maxConnections) {
-        socket.emit('connected', { numUsers: ++numConnections });
+        socket.emit('connected2', { numUsers: ++numConnections }); // demo regression: F-99
         return true;
     }
     else {
