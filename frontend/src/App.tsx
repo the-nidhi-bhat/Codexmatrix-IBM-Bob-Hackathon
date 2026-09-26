@@ -7,6 +7,7 @@ import ExecutionScreen from "./screens/ExecutionScreen";
 import VerificationScreen from "./screens/VerificationScreen";
 import RollbackScreen from "./screens/RollbackScreen";
 import ReportScreen from "./screens/ReportScreen";
+import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
 import "./App.css";
 
 type Screen = "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
@@ -39,23 +40,17 @@ const PHASE_LABELS: Record<Screen, string> = {
   report:       "Report",
 };
 
-export default function App() {
+// ── Dashboard (rendered inside WorkflowProvider) ─────────────────────────────
+
+function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: () => void }) {
+  const { state } = useWorkflow();
+  const { safetyNet, repository, overallProgress } = state;
+
   const [active, setActive] = useState<Screen>("overview");
-  const [repoUrl, setRepoUrl] = useState<string | null>(null);
 
   function navigate(screen: Screen) {
     setActive(screen);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function handleStart(url: string) {
-    setRepoUrl(url);
-    setActive("overview");
-  }
-
-  // Entry gate: show start screen until a repo is provided
-  if (!repoUrl) {
-    return <StartScreen onStart={handleStart} />;
   }
 
   return (
@@ -101,26 +96,26 @@ export default function App() {
               {PHASE_LABELS[active]}
             </span>
           </span>
-          {/* Safety net badge */}
+          {/* Safety net badge — from workflow state */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 6,
               padding: "4px 10px",
-              background: "#23863622",
-              border: "1px solid #23863644",
+              background: safetyNet.failing === 0 ? "#23863622" : "var(--red-dim)",
+              border: `1px solid ${safetyNet.failing === 0 ? "#23863644" : "#da363344"}`,
               borderRadius: 20,
             }}
           >
-            <span style={{ color: "var(--green)", fontSize: 10 }}>●</span>
-            <span style={{ color: "var(--green)", fontSize: 12, fontWeight: 600 }}>
-              27/27 tests passing
+            <span style={{ color: safetyNet.failing === 0 ? "var(--green)" : "var(--red)", fontSize: 10 }}>●</span>
+            <span style={{ color: safetyNet.failing === 0 ? "var(--green)" : "var(--red)", fontSize: 12, fontWeight: 600 }}>
+              {safetyNet.passing}/{safetyNet.total} tests passing
             </span>
           </div>
           {/* Change repo */}
           <button
-            onClick={() => setRepoUrl(null)}
+            onClick={onChangeRepo}
             style={{
               padding: "4px 10px",
               background: "transparent",
@@ -217,10 +212,10 @@ export default function App() {
           >
             <div style={{ color: "var(--muted)", fontSize: 10, lineHeight: 1.9, wordBreak: "break-all" }}>
               <div style={{ color: "var(--text)", fontWeight: 600, marginBottom: 2 }}>
-                legacy-ecommerce-api
+                {repository.name}
               </div>
-              <div>Node.js 12 → 18 LTS</div>
-              <div style={{ color: "var(--green)" }}>45% complete</div>
+              <div>{repository.runtime.split(" ")[0]} {repository.runtime.split(" ")[1]} → 18 LTS</div>
+              <div style={{ color: "var(--green)" }}>{overallProgress}% complete</div>
               <div style={{ color: "var(--muted)", marginTop: 4, fontSize: 9, opacity: 0.7 }}>
                 {repoUrl}
               </div>
@@ -229,7 +224,7 @@ export default function App() {
         </aside>
 
         {/* Main content */}
-        <main style={{ flex: 1, padding: "28px 32px", maxWidth: 880, minWidth: 0 }}>
+        <main style={{ flex: 1, padding: "28px 40px", minWidth: 0, maxWidth: 1400 }}>
           {active === "overview"     && <OverviewScreen repoUrl={repoUrl} />}
           {active === "risk"         && <RiskScreen />}
           {active === "plan"         && <PlanScreen />}
@@ -245,5 +240,21 @@ export default function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+// ── Root App — entry gate + provider ─────────────────────────────────────────
+
+export default function App() {
+  const [repoUrl, setRepoUrl] = useState<string | null>(null);
+
+  if (!repoUrl) {
+    return <StartScreen onStart={(url) => setRepoUrl(url)} />;
+  }
+
+  return (
+    <WorkflowProvider repoUrl={repoUrl}>
+      <Dashboard repoUrl={repoUrl} onChangeRepo={() => setRepoUrl(null)} />
+    </WorkflowProvider>
   );
 }

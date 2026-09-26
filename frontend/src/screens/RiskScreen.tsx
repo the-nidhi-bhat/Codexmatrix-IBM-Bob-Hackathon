@@ -1,11 +1,11 @@
 import { useState } from "react";
-import type { RiskItem, RiskLevel } from "../mockData";
-import { risks } from "../mockData";
+import type { RiskFinding, RiskLevel } from "../workflow/types";
+import { useWorkflow } from "../workflow/WorkflowContext";
 
 const LEVEL_ORDER: RiskLevel[] = ["high", "medium", "low"];
 
 function RiskCard({ item, expanded, onToggle }: {
-  item: RiskItem;
+  item: RiskFinding;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -98,9 +98,9 @@ function RiskCard({ item, expanded, onToggle }: {
 
 function CountPill({ level, count }: { level: RiskLevel; count: number }) {
   const colors: Record<RiskLevel, { bg: string; color: string }> = {
-    high: { bg: "var(--red-dim)", color: "var(--red)" },
+    high:   { bg: "var(--red-dim)",    color: "var(--red)"    },
     medium: { bg: "var(--yellow-dim)", color: "var(--yellow)" },
-    low: { bg: "var(--accent-dim)", color: "var(--accent)" },
+    low:    { bg: "var(--accent-dim)", color: "var(--accent)" },
   };
   return (
     <div
@@ -120,17 +120,19 @@ function CountPill({ level, count }: { level: RiskLevel; count: number }) {
 }
 
 export default function RiskScreen() {
+  const { state } = useWorkflow();
+  const risks = state.risks;
+
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<RiskLevel | "all">("all");
 
   const counts = {
-    high: risks.filter((r) => r.level === "high").length,
+    high:   risks.filter((r) => r.level === "high").length,
     medium: risks.filter((r) => r.level === "medium").length,
-    low: risks.filter((r) => r.level === "low").length,
+    low:    risks.filter((r) => r.level === "low").length,
   };
 
   const filtered = filter === "all" ? risks : risks.filter((r) => r.level === filter);
-  // Sort by severity within filtered
   const sorted = [...filtered].sort(
     (a, b) => LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level)
   );
@@ -144,14 +146,12 @@ export default function RiskScreen() {
         </p>
       </div>
 
-      {/* Summary pills */}
       <div style={{ display: "flex", gap: 12 }}>
-        <CountPill level="high" count={counts.high} />
+        <CountPill level="high"   count={counts.high} />
         <CountPill level="medium" count={counts.medium} />
-        <CountPill level="low" count={counts.low} />
+        <CountPill level="low"    count={counts.low} />
       </div>
 
-      {/* Filter bar */}
       <div style={{ display: "flex", gap: 8 }}>
         {(["all", "high", "medium", "low"] as const).map((lvl) => (
           <button
@@ -173,7 +173,6 @@ export default function RiskScreen() {
         ))}
       </div>
 
-      {/* Risk list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {sorted.map((item) => (
           <RiskCard

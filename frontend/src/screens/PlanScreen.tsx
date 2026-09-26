@@ -1,12 +1,14 @@
 import { useState } from "react";
-import type { PlanStep, StepStatus } from "../mockData";
-import { planSteps } from "../mockData";
+import type { PlanStep, StepStatus } from "../workflow/types";
+import { useWorkflow } from "../workflow/WorkflowContext";
 
 const STATUS_CONFIG: Record<StepStatus, { icon: string; color: string; label: string }> = {
-  completed: { icon: "✓", color: "var(--green)", label: "Completed" },
-  executing: { icon: "⟳", color: "var(--yellow)", label: "Executing" },
-  pending: { icon: "○", color: "var(--muted)", label: "Pending" },
-  failed: { icon: "✗", color: "var(--red)", label: "Failed" },
+  pending:     { icon: "○", color: "var(--muted)",   label: "Pending" },
+  running:     { icon: "⟳", color: "var(--yellow)",  label: "Executing" },
+  passed:      { icon: "✓", color: "var(--green)",   label: "Completed" },
+  failed:      { icon: "✗", color: "var(--red)",     label: "Failed" },
+  rolled_back: { icon: "↺", color: "var(--yellow)",  label: "Rolled back" },
+  recovered:   { icon: "✓", color: "var(--green)",   label: "Recovered" },
 };
 
 function ConnectorLine({ active }: { active: boolean }) {
@@ -50,9 +52,9 @@ function StepRow({ step, isLast, selected, onSelect }: {
               borderRadius: "50%",
               border: `2px solid ${cfg.color}`,
               background:
-                step.status === "completed"
+                step.status === "passed" || step.status === "recovered"
                   ? "#23863633"
-                  : step.status === "executing"
+                  : step.status === "running"
                   ? "#9e6a0333"
                   : "var(--surface-2)",
               display: "flex",
@@ -91,11 +93,11 @@ function StepRow({ step, isLast, selected, onSelect }: {
                 padding: "1px 8px",
                 borderRadius: 10,
                 background:
-                  step.status === "completed"
+                  step.status === "passed" || step.status === "recovered"
                     ? "#23863633"
-                    : step.status === "executing"
+                    : step.status === "running"
                     ? "#9e6a0333"
-                    : step.status === "failed"
+                    : step.status === "failed" || step.status === "rolled_back"
                     ? "var(--red-dim)"
                     : "var(--surface-2)",
                 color: cfg.color,
@@ -162,15 +164,20 @@ function StepRow({ step, isLast, selected, onSelect }: {
       </div>
 
       {!isLast && (
-        <ConnectorLine active={step.status === "completed"} />
+        <ConnectorLine active={step.status === "passed" || step.status === "recovered"} />
       )}
     </div>
   );
 }
 
 export default function PlanScreen() {
-  const [selected, setSelected] = useState<number | null>(3); // default: executing step
-  const completed = planSteps.filter((s) => s.status === "completed").length;
+  const { state } = useWorkflow();
+  const planSteps = state.plan;
+
+  const [selected, setSelected] = useState<number | null>(3);
+  const completed  = planSteps.filter((s) => s.status === "passed" || s.status === "recovered").length;
+  const inProgress = planSteps.filter((s) => s.status === "running").length;
+  const pending    = planSteps.filter((s) => s.status === "pending").length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -181,12 +188,11 @@ export default function PlanScreen() {
         </p>
       </div>
 
-      {/* Progress summary */}
       <div className="card" style={{ display: "flex", gap: 24, alignItems: "center" }}>
         {[
-          { label: "Completed", count: completed, color: "var(--green)" },
-          { label: "In Progress", count: 1, color: "var(--yellow)" },
-          { label: "Pending", count: planSteps.length - completed - 1, color: "var(--muted)" },
+          { label: "Completed",   count: completed,  color: "var(--green)"  },
+          { label: "In Progress", count: inProgress, color: "var(--yellow)" },
+          { label: "Pending",     count: pending,    color: "var(--muted)"  },
           { label: "Total Steps", count: planSteps.length, color: "var(--text)" },
         ].map(({ label, count, color }) => (
           <div key={label} style={{ textAlign: "center" }}>
@@ -196,7 +202,6 @@ export default function PlanScreen() {
         ))}
       </div>
 
-      {/* Timeline */}
       <div className="card" style={{ paddingBottom: 8 }}>
         {planSteps.map((step, idx) => (
           <StepRow

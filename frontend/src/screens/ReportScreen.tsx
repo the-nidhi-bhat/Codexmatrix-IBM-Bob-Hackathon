@@ -1,7 +1,10 @@
-import { reportData } from "../mockData";
+import { useWorkflow } from "../workflow/WorkflowContext";
 
 export default function ReportScreen() {
-  const r = reportData;
+  const { state } = useWorkflow();
+  const r = state.report;
+  const repo = state.repository;
+  const net = state.safetyNet;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -49,7 +52,7 @@ export default function ReportScreen() {
           {[
             { label: "Steps Completed",  value: r.stepsCompleted.toString(),  color: "var(--green)" },
             { label: "Steps Rolled Back", value: r.stepsRolledBack.toString(), color: "var(--yellow)" },
-            { label: "Tests Passing",    value: `${r.testsPassing}/${r.testsTotal}`, color: "var(--green)" },
+            { label: "Tests Passing",    value: `${net.passing}/${net.total}`,        color: "var(--green)" },
             { label: "Duration",         value: r.duration,                   color: "var(--text)" },
           ].map(({ label, value, color }) => (
             <div
@@ -69,8 +72,8 @@ export default function ReportScreen() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[
-            { label: "Repository", value: r.repo },
-            { label: "Runtime Upgrade", value: r.runtimeUpgrade },
+            { label: "Repository",     value: repo.name },
+            { label: "Runtime Upgrade", value: `${repo.runtime} → 18 LTS` },
             { label: "Session started", value: r.startedAt },
             { label: "Session ended", value: r.endedAt },
           ].map(({ label, value }) => (

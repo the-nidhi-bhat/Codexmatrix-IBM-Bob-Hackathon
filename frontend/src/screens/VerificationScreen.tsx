@@ -1,11 +1,15 @@
-import { verificationResults } from "../mockData";
+import { useWorkflow } from "../workflow/WorkflowContext";
 
 export default function VerificationScreen({ onRollback }: { onRollback?: () => void }) {
-  const v = verificationResults;
-  const passed = v.tests.filter((t) => t.status === "passed").length;
-  const failed = v.tests.filter((t) => t.status === "failed").length;
+  const { activeVerification, verificationMode, setVerificationMode, state } = useWorkflow();
+  const v = activeVerification;
+
+  const passed  = v.tests.filter((t) => t.status === "passed").length;
+  const failed  = v.tests.filter((t) => t.status === "failed").length;
   const skipped = v.tests.filter((t) => t.status === "skipped").length;
   const overallPass = failed === 0;
+
+  const stepTitle = state.plan.find((s) => s.id === v.stepId)?.title ?? `Step ${v.stepId}`;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -16,19 +20,52 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
             Safety-net tests run after every modernization step.
           </p>
         </div>
-        {/* Demo notice */}
-        <div
-          style={{
-            padding: "4px 12px",
-            background: "#9e6a0315",
-            border: "1px solid #9e6a0333",
-            borderRadius: 20,
-            fontSize: 11,
-            color: "var(--yellow)",
-            fontWeight: 600,
-          }}
-        >
-          Demo · mock data
+        {/* Scenario toggle + demo label */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ color: "var(--muted)", fontSize: 12 }}>Demo scenario:</span>
+          <button
+            onClick={() => setVerificationMode("pass")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: 4,
+              border: `1px solid ${verificationMode === "pass" ? "var(--green)" : "var(--border)"}`,
+              background: verificationMode === "pass" ? "#23863622" : "transparent",
+              color: verificationMode === "pass" ? "var(--green)" : "var(--muted)",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            PASS
+          </button>
+          <button
+            onClick={() => setVerificationMode("fail")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: 4,
+              border: `1px solid ${verificationMode === "fail" ? "var(--red)" : "var(--border)"}`,
+              background: verificationMode === "fail" ? "var(--red-dim)" : "transparent",
+              color: verificationMode === "fail" ? "var(--red)" : "var(--muted)",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            FAIL
+          </button>
+          <div
+            style={{
+              padding: "4px 10px",
+              background: "#9e6a0315",
+              border: "1px solid #9e6a0333",
+              borderRadius: 4,
+              fontSize: 11,
+              color: "var(--yellow)",
+              fontWeight: 600,
+            }}
+          >
+            Demo · mock data
+          </div>
         </div>
       </div>
 
@@ -58,7 +95,7 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
             {overallPass ? "PASS — All safety-net tests passing" : "FAIL — Regression detected"}
           </div>
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
-            Step {v.step} · {v.suite} · {v.duration}
+            Step {v.stepId}: {stepTitle} · {v.suite} · {v.duration}
           </div>
         </div>
         {!overallPass && onRollback && (
@@ -82,7 +119,7 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
         )}
       </div>
 
-      {/* Summary pills */}
+      {/* Summary pills — counts come from workflow state */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
         {[
           { label: "Total",   count: v.tests.length, color: "var(--text)",   bg: "var(--surface-2)" },

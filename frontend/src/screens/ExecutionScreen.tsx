@@ -1,30 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { executionState } from "../mockData";
+import { useWorkflow } from "../workflow/WorkflowContext";
 
 const FINAL_LOG_LINE = { time: "10:42:13", text: "✓ All 27 tests passed. Step complete." };
 const FAIL_LOG_LINE  = { time: "10:42:13", text: "✗ 1 test failed — regression detected. Initiating rollback…" };
 
 export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: () => void; onRollback?: () => void }) {
+  const { state } = useWorkflow();
+  const { execution, plan } = state;
+  const currentStep = plan.find((s) => s.id === execution.currentStepId) ?? plan[0];
+
   const [visibleLines, setVisibleLines] = useState(0);
   const [done, setDone] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  // Animate log lines appearing one by one
   useEffect(() => {
-    if (visibleLines < executionState.log.length) {
+    if (visibleLines < execution.log.length) {
       const t = setTimeout(() => setVisibleLines((v) => v + 1), 420);
       return () => clearTimeout(t);
     } else if (!done) {
-      // After log finishes, simulate test result
       const t = setTimeout(() => setDone(true), 800);
       return () => clearTimeout(t);
     }
-  }, [visibleLines, done]);
+  }, [visibleLines, done, execution.log.length]);
 
-  const shownLines = executionState.log.slice(0, visibleLines);
+  const shownLines = execution.log.slice(0, visibleLines);
   const finalLine = done ? (failed ? FAIL_LOG_LINE : FINAL_LOG_LINE) : null;
 
-  const step = executionState.currentStep;
+  const step = currentStep;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -123,7 +125,7 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
                 <span>{finalLine.text}</span>
               </div>
             )}
-            {!done && visibleLines === executionState.log.length && (
+            {!done && visibleLines === execution.log.length && (
               <span style={{ color: "var(--muted)", animation: "pulse 1s infinite" }}>▌</span>
             )}
           </div>
@@ -133,7 +135,7 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="card">
             <div className="section-title">Files Changed</div>
-            {executionState.filesChanged.map((fc) => (
+            {execution.filesChanged.map((fc) => (
               <div
                 key={fc.file}
                 style={{
@@ -168,17 +170,17 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
             {!done ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--yellow)" }}>
                 <span style={{ fontSize: 18 }}>⟳</span>
-                <span>Running 27 tests…</span>
+                <span>Running {state.safetyNet.total} tests…</span>
               </div>
             ) : finalLine?.text.startsWith("✓") ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--green)" }}>
                 <span style={{ fontSize: 18 }}>✓</span>
-                <span style={{ fontWeight: 700 }}>27/27 passed</span>
+                <span style={{ fontWeight: 700 }}>{state.safetyNet.total}/{state.safetyNet.total} passed</span>
               </div>
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--red)" }}>
                 <span style={{ fontSize: 18 }}>✗</span>
-                <span style={{ fontWeight: 700 }}>1 test failed — regression</span>
+                <span style={{ fontWeight: 700 }}>2 tests failed — regression</span>
               </div>
             )}
           </div>

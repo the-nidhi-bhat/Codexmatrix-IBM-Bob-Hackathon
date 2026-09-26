@@ -1,19 +1,22 @@
 import { Fragment, useState } from "react";
-import { rollbackScenario } from "../mockData";
+import { useWorkflow } from "../workflow/WorkflowContext";
+import type { RollbackTimelineStatus } from "../workflow/types";
 
-type TimelineStatus = "regression" | "rollback" | "restored";
-
-const TIMELINE_CONFIG: Record<TimelineStatus, { icon: string; color: string; bg: string }> = {
+const TIMELINE_CONFIG: Record<RollbackTimelineStatus, { icon: string; color: string; bg: string }> = {
   regression: { icon: "✗", color: "var(--red)",    bg: "var(--red-dim)" },
   rollback:   { icon: "↺", color: "var(--yellow)", bg: "var(--yellow-dim)" },
   restored:   { icon: "✓", color: "var(--green)",  bg: "#23863633" },
 };
 
 export default function RollbackScreen() {
-  const [step, setStep] = useState(0); // 0 = nothing revealed yet
-  const { timeline, failedTest, bobExplanation, saferAlternative } = rollbackScenario;
+  const { state } = useWorkflow();
+  const rb = state.rollback;
 
-  const totalSteps = timeline.length;
+  const [step, setStep] = useState(0);
+
+  const totalSteps = rb.timeline.length;
+
+  const stepTitle = state.plan.find((s) => s.id === rb.stepId)?.title ?? `Step ${rb.stepId}`;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -34,10 +37,50 @@ export default function RollbackScreen() {
         </div>
       </div>
 
+      {/* Step context */}
+      <div
+        style={{
+          padding: "10px 16px",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          display: "flex",
+          gap: 24,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <span style={{ color: "var(--muted)", fontSize: 11 }}>Step  </span>
+          <span style={{ fontWeight: 600 }}>Step {rb.stepId} — {stepTitle}</span>
+        </div>
+        <div className="mono" style={{ fontSize: 11 }}>
+          <span style={{ color: "var(--muted)" }}>good commit  </span>
+          <span style={{ color: "var(--green)" }}>{rb.previousCommit}</span>
+          <span style={{ color: "var(--muted)", margin: "0 8px" }}>→</span>
+          <span style={{ color: "var(--muted)" }}>failed commit  </span>
+          <span style={{ color: "var(--red)" }}>{rb.failedCommit}</span>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+          <span style={{ fontSize: 12 }}>
+            <span style={{ color: "var(--muted)" }}>Rollback:  </span>
+            <span style={{ color: rb.rollbackStatus === "complete" ? "var(--green)" : "var(--yellow)", fontWeight: 600 }}>
+              {rb.rollbackStatus}
+            </span>
+          </span>
+          <span style={{ fontSize: 12 }}>
+            <span style={{ color: "var(--muted)" }}>Recovery:  </span>
+            <span style={{ color: rb.recoveryValidation === "passed" ? "var(--green)" : "var(--yellow)", fontWeight: 600 }}>
+              {rb.recoveryValidation}
+            </span>
+          </span>
+        </div>
+      </div>
+
       {/* Main timeline */}
       <div className="card" style={{ display: "flex", gap: 0 }}>
-        {timeline.map((item, idx) => {
-          const cfg = TIMELINE_CONFIG[item.status as TimelineStatus];
+        {rb.timeline.map((item, idx) => {
+          const cfg = TIMELINE_CONFIG[item.status as RollbackTimelineStatus];
           const active = idx < step;
           const current = idx === step - 1;
           return (
@@ -79,7 +122,7 @@ export default function RollbackScreen() {
                   {active ? item.time : "--:--:--"}
                 </div>
               </div>
-              {idx < timeline.length - 1 && (
+              {idx < rb.timeline.length - 1 && (
                 <div
                   style={{
                     alignSelf: "center",
@@ -105,19 +148,13 @@ export default function RollbackScreen() {
         >
           <div className="section-title" style={{ color: "var(--red)" }}>Failed Test</div>
           <div style={{ marginBottom: 10, fontWeight: 600 }}>
-            {failedTest.name}
+            {rb.failedTestName}
           </div>
           <div className="mono" style={{ color: "var(--muted)", marginBottom: 12 }}>
-            {failedTest.file}
-            <span style={{ color: "var(--accent)" }}>:{failedTest.line}</span>
+            {rb.failedTestFile}
+            <span style={{ color: "var(--accent)" }}>:{rb.failedTestLine}</span>
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div
               style={{
                 padding: "10px 14px",
@@ -128,7 +165,7 @@ export default function RollbackScreen() {
             >
               <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>Expected</div>
               <div className="mono" style={{ color: "var(--green)", fontSize: 16, fontWeight: 700 }}>
-                {failedTest.expected}
+                {rb.expectedValue}
               </div>
             </div>
             <div
@@ -141,7 +178,7 @@ export default function RollbackScreen() {
             >
               <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 4 }}>Received</div>
               <div className="mono" style={{ color: "var(--red)", fontSize: 16, fontWeight: 700 }}>
-                {failedTest.received}
+                {rb.receivedValue}
               </div>
             </div>
           </div>
@@ -155,7 +192,7 @@ export default function RollbackScreen() {
               fontStyle: "italic",
             }}
           >
-            {failedTest.error}
+            {rb.errorMessage}
           </div>
         </div>
       )}
@@ -167,7 +204,7 @@ export default function RollbackScreen() {
           style={{ border: "1px solid #23863655", animation: "fadeIn 0.3s ease" }}
         >
           <div className="section-title" style={{ color: "var(--green)" }}>IBM Bob's Explanation</div>
-          <p style={{ lineHeight: 1.8, marginBottom: 16 }}>{bobExplanation}</p>
+          <p style={{ lineHeight: 1.8, marginBottom: 16 }}>{rb.bobExplanation}</p>
 
           <div className="section-title" style={{ color: "var(--accent)" }}>Safer Alternative</div>
           <div
@@ -180,7 +217,7 @@ export default function RollbackScreen() {
               lineHeight: 1.7,
             }}
           >
-            {saferAlternative}
+            {rb.saferAlternative}
           </div>
         </div>
       )}
@@ -201,10 +238,10 @@ export default function RollbackScreen() {
           <span style={{ fontSize: 28, color: "var(--green)" }}>✓</span>
           <div>
             <div style={{ fontWeight: 700, color: "var(--green)", fontSize: 15 }}>
-              Repository restored to last safe state
+              Repository restored to commit {rb.previousCommit}
             </div>
             <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
-              Safety net: 27/27 tests passing — ready for next attempt
+              Recovery validation: {rb.recoveryValidation} · {state.safetyNet.total}/{state.safetyNet.total} tests passing — ready for next attempt
             </div>
           </div>
         </div>

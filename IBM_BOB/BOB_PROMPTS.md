@@ -72,3 +72,43 @@ Record of important prompts/tasks given to IBM Bob and the resulting work perfor
 - Updated `BOB_PROMPTS.md` (this file) with this record
 
 **Outcome:** ✅ Correction recorded. Waiting for the actual hackathon problem statement/challenge.
+
+---
+
+## Prompt 003 — Build Legacy Code Whisperer Frontend Dashboard
+
+**Date:** 2025-09-26
+
+**User Prompt Summary:**
+
+> Build the full frontend/dashboard for the Legacy Code Whisperer IBM Bob Hackathon project. Use React + Vite. Build 5 screens covering the Understand → Protect → Assess → Plan → Execute → Verify → Rollback → Recover workflow. Use mock data if backend isn't ready. The Rollback screen is the most important — it must clearly show: Regression detected → Rollback initiated → Previous state restored, then Bob's explanation and safer alternative. Include evidence of meaningful IBM Bob usage.
+
+**Rules/Constraints from user:**
+
+1. Use mock JSON/data for UI — don't wait for backend
+2. Do NOT touch backend, rollback engine, AI architecture, or Bob configuration
+3. Build clean, professional UI that makes the safety workflow visually obvious
+4. Keep IBM_BOB/ records updated as hackathon evidence
+5. Ask if stuck — don't redesign the whole project
+
+**Work Performed by IBM Bob:**
+
+- Inspected workspace (README, IBM_BOB docs, git status)
+- Scaffolded `frontend/` with Vite + React + TypeScript
+- Built complete design system and 5 screen components
+- Wired all mock data and inter-screen navigation
+- Verified build: 0 TS errors, production bundle clean
+- Updated IBM_BOB documentation (BOB_USAGE.md Entry 003, BOB_CHANGES.md Change 002)
+
+**Resulting Files:**
+
+- `frontend/` — complete Vite + React + TypeScript project
+- `frontend/src/mockData.ts` — typed mock data layer
+- `frontend/src/App.tsx` — shell with header, sidebar, router
+- `frontend/src/screens/OverviewScreen.tsx`
+- `frontend/src/screens/RiskScreen.tsx`
+- `frontend/src/screens/PlanScreen.tsx`
+- `frontend/src/screens/ExecutionScreen.tsx`
+- `frontend/src/screens/RollbackScreen.tsx`
+
+**Outcome:** ✅ Complete. Dev server live at http://localhost:5173. All 5 screens functional with mock data.

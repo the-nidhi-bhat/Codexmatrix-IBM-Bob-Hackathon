@@ -84,3 +84,14 @@ a {
   font-family: "SF Mono", "Cascadia Mono", "Fira Code", monospace;
   font-size: 12px;
 }
+
+/* ── StartScreen responsive layout ── */
+@media (max-width: 860px) {
+  .start-grid {
+    grid-template-columns: 1fr !important;
+    padding: 32px 20px !important;
+  }
+  .start-grid > div:first-child {
+    padding-right: 0 !important;
+  }
+}
