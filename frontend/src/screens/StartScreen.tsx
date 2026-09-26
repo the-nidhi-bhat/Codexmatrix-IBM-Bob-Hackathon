@@ -14,12 +14,6 @@ interface StartScreenProps {
   errorCode?: string;
 }
 
-const EXAMPLE_REPOS = [
-  "https://github.com/codexmatrix/legacy-ecommerce-api",
-  "https://github.com/example/legacy-express-app",
-  "https://github.com/acme/old-node-monolith",
-];
-
 const WORKFLOW_PHASES = [
   { n: "01", label: "UNDERSTAND", desc: "Inspect repository structure, dependencies, and runtime" },
   { n: "02", label: "PROTECT",    desc: "Generate behavioral safety-net tests before any change" },
@@ -83,12 +77,6 @@ export default function StartScreen({
     }
     setLocalError("");
     onStart(trimmed);
-  }
-
-  function useExample(repo: string) {
-    if (loading) return;
-    setUrl(repo);
-    setLocalError("");
   }
 
   return (
@@ -311,34 +299,6 @@ export default function StartScreen({
                   </div>
                 )}
 
-                {/* Examples */}
-                {!loading && (
-                  <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ color: "var(--muted)", fontSize: 11, flexShrink: 0 }}>Try:</span>
-                    {EXAMPLE_REPOS.map((repo) => {
-                      const short = repo.replace("https://github.com/", "");
-                      return (
-                        <button
-                          key={repo}
-                          type="button"
-                          onClick={() => useExample(repo)}
-                          className="mono"
-                          style={{
-                            background: "transparent",
-                            border: "1px solid var(--border)",
-                            borderRadius: 3,
-                            color: "var(--accent)",
-                            fontSize: 11,
-                            padding: "2px 8px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {short}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             </div>
           </form>
