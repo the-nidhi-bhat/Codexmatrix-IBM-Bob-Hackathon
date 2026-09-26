@@ -10,7 +10,7 @@
  */
 
 var parser = require('node-expression-eval');
-var uuid = require('node-uuid');
+var uuidv4 = require('uuid').v4;
 var Timer = require('./timer');
 var cards = require('./cards');
 var config = require('./config');
@@ -18,7 +18,7 @@ var config = require('./config');
 var Game = function (io) {	
 	/** Set initial values */
 	var playerCount = 0;
-	var gameId = uuid.v4();
+	var gameId = uuidv4();
 	var gameCard = getRandomCard();
 	
 	/** Configure the game's internal timer */
