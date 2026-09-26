@@ -58,6 +58,7 @@ var Game = function (io) {
 		});
 		
 		socket.on('submitExpression', function (data) {
+			if (typeof data.expression !== 'string') return;
 			var res = validate(data.expression);
 			if (res === 0) {
 				var passedEval = true;
