@@ -74,3 +74,36 @@ Concise technical record of every change made with IBM Bob — files affected, t
 - `ASSESS.md` and `PLAN.md` not touched
 - Secret scan: no passwords, tokens, or credentials found
 - `git diff --stat HEAD` confirmed correct files only
+
+---
+
+## Change 003 — EXECUTION-PLAN-ARATI.md created + bob_sessions/ created
+
+**Date:** 2026-09-26 (third session)
+**Team member:** Arati (IBM Bob IDE)
+**Branch:** `arati/risk-analysis` → this commit
+
+### Files Created
+
+| File | Action | Description |
+|------|--------|-------------|
+| `legacy/get24-baseline/analysis/EXECUTION-PLAN-ARATI.md` | Created | Implementation-ready execution specification: 18-test quick reference, checkpoint model, completed step evidence, Steps 3–7 execution specs (16 fields each), 8-phase demo script with controlled regression, risk table, sequencing notes |
+| `bob_sessions/2026-09-26-execution-plan.md` | Created | Bob task session summary for this session |
+
+### Files Updated
+
+| File | Action | Description |
+|------|--------|-------------|
+| `IBM_BOB/BOB_USAGE.md` | Updated | Entry 003 added |
+| `IBM_BOB/BOB_CHANGES.md` | Updated | Change 003 added |
+| `IBM_BOB/BOB_PROMPTS.md` | Updated | Prompt 003 added |
+
+### Verification
+
+- Only intended files changed (2 new + 3 updated IBM_BOB/tracking files)
+- No production code modified
+- `ASSESS.md` and `PLAN.md` not touched
+- No test files modified
+- `.opencode/` not touched
+- Secret scan: no passwords, tokens, or credentials
+- `git diff --check` clean

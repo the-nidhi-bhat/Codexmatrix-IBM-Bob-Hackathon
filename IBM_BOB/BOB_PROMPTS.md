@@ -96,3 +96,52 @@ Record of important prompts/tasks given to IBM Bob and the resulting work perfor
 
 **Branch:** `arati/risk-analysis`
 **Outcome:** ✅ Analysis v2 committed and pushed.
+
+---
+
+## Prompt 003 — Modernization Execution Specification (arati/risk-analysis branch)
+
+**Date:** 2026-09-26 (third session)
+**Team member:** Arati (IBM Bob IDE)
+**User Prompt Summary:**
+
+> Create a precise, implementation-ready modernization execution specification for Get24. Connect ASSESS findings to modernization steps, affected files, expected behavior, protecting tests, validation commands, success conditions, rollback conditions, and recovery actions. Document completed steps 1–2. Include a demo specification for Socket.IO modernization with controlled regression scenario. Use IBM Bob meaningfully. Create bob_sessions/ summary. Commit and push.
+
+**Rules applied:**
+
+1. Inspect all source files and test files before writing a word of the execution plan
+2. Use only real test names, real commands, real file/line evidence — no invented results
+3. Do not implement any modernization
+4. Do not touch ASSESS.md, PLAN.md, application source, or test files
+5. Create bob_sessions/ if it does not exist
+6. Stage only intended documentation files; push to same branch
+
+**Work Performed by IBM Bob:**
+
+- Full re-inspection of: `server/index.js`, `server/game/index.js`, `package.json`, `index.js`, `public/js/SocketController.js`, `public/js/StageController.js`, `public/index.html`, all 3 test files, `harness.js`, `run.sh`, `tests/README.md`, `ASSESS.md`, `PLAN.md`, `ASSESS-ARATI.md`
+- Confirmed `bob_sessions/` does not exist; created it
+- Confirmed current Step 1 and Step 2 evidence in live code
+- Created `legacy/get24-baseline/analysis/EXECUTION-PLAN-ARATI.md`
+- Created `bob_sessions/2026-09-26-execution-plan.md`
+- Updated IBM_BOB tracking files
+
+**Resulting Files Created:**
+
+- `legacy/get24-baseline/analysis/EXECUTION-PLAN-ARATI.md`
+- `bob_sessions/2026-09-26-execution-plan.md`
+
+**Files Updated:**
+
+- `IBM_BOB/BOB_USAGE.md`
+- `IBM_BOB/BOB_CHANGES.md`
+- `IBM_BOB/BOB_PROMPTS.md`
+
+**Files NOT Modified:**
+
+- `ASSESS.md` (Nidhi/OpenCode — not touched)
+- `PLAN.md` (Nidhi/OpenCode — not touched)
+- All legacy application source files
+- All test files
+
+**Branch:** `arati/risk-analysis`
+**Outcome:** ✅ Execution specification committed and pushed.
