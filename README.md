@@ -1,57 +1,92 @@
-# Codexmatrix — IBM Bob 2.0 Hackathon
+# Legacy Code Whisperer
 
-Welcome to the official repository for **Team Codexmatrix**, participating in the **IBM Bob 2.0 Hackathon**.
+**Team:** Codexmatrix
 
----
+**Event:** IBM Bob 2.0 Hackathon
 
-## Team
+Legacy Code Whisperer is a safety-first developer workflow for modernizing legacy applications with IBM Bob.
 
-| Name | Role |
-|------|------|
-| **Nidhi** | Team Lead |
-| **Arati** | Team Member |
-| **Iffa** | Team Member |
-| **Samrudhi** | Team Member |
+> Legacy Code Whisperer does not blindly modify legacy code. It first protects existing behavior with tests, makes modernization changes incrementally, verifies every change, and rolls back when a regression is detected.
 
----
+The product is currently at the foundation stage. The concept, workflow, and team responsibilities are defined; the legacy application and product implementation are not yet present.
 
-## About IBM Bob
+## Core workflow
 
-This project is built using **IBM Bob** — IBM's AI software development assistant. IBM Bob is used throughout this project for meaningful engineering tasks including scaffolding, implementation, debugging, testing, documentation, and code review.
+The planned workflow is:
 
-All IBM Bob contributions are tracked and documented in the [`IBM_BOB/`](./IBM_BOB/) folder for full transparency and hackathon evidence.
+**Understand → Protect → Assess → Plan → Execute → Verify → Rollback → Recover → Report**
 
----
+These phases describe the intended safety process. They are not all implemented yet.
 
-## IBM Bob Evidence
+| Phase | Intended purpose |
+|---|---|
+| **Understand** | Inspect the legacy repository, its behavior, and its dependencies before changing anything. |
+| **Protect** | Capture existing behavior with tests so it can be checked after changes. |
+| **Assess** | Identify the risk and change surface of a proposed modernization. |
+| **Plan** | Define small, incremental modernization steps. |
+| **Execute** | Apply controlled changes to the legacy codebase. |
+| **Verify** | Run the relevant checks and tests after each change. |
+| **Rollback** | Revert a change when verification detects a regression. |
+| **Recover** | Restore a safe, understandable state after a failed change. |
+| **Report** | Record the change, evidence, and outcome. |
 
-| File | Purpose |
-|------|---------|
-| [`IBM_BOB/BOB_USAGE.md`](./IBM_BOB/BOB_USAGE.md) | Chronological log of meaningful IBM Bob contributions |
-| [`IBM_BOB/BOB_CHANGES.md`](./IBM_BOB/BOB_CHANGES.md) | Technical record of Bob-assisted changes (files, commands, verification) |
-| [`IBM_BOB/BOB_PROMPTS.md`](./IBM_BOB/BOB_PROMPTS.md) | Record of important prompts given to IBM Bob and resulting work |
+## Team responsibilities
 
----
+| Team member | Responsibility |
+|---|---|
+| **Nidhi** | Technical lead; architecture and integration; IBM Bob + OpenCode. |
+| **Arati** | Legacy analysis and risk analysis. SIH responsibilities are also a priority, so hackathon work is intentionally scoped. |
+| **Iffa** | Frontend/UI. SIH responsibilities are also a priority, so hackathon work is intentionally scoped. |
+| **Samrudhi** | Testing, validation, and rollback. |
 
-## Project Status
+## IBM Bob
 
-> **The application is currently under active development.**  
-> The project concept and architecture will be defined once the hackathon challenge requirements are provided.
+IBM Bob is intended to be a core part of the final solution. Potential Bob responsibilities include:
 
----
+- Legacy repository understanding
+- Behavioral test generation
+- Modernization assessment
+- Modernization planning
+- Controlled code changes
+- Verification
+- Regression investigation
+- Safer alternatives
 
-## Repository Structure
+These are planned responsibilities, not capabilities that are already implemented or measured.
 
-```
+## OpenCode
+
+OpenCode is Nidhi's personal development tool and is separate from IBM Bob. Work performed with OpenCode is not recorded as an IBM Bob contribution.
+
+## Current status
+
+The repository is in the foundation stage:
+
+- Project concept locked: **Legacy Code Whisperer**
+- Safety workflow locked
+- Team roles defined
+- Repository initialized and connected to GitHub
+- IBM Bob documentation established in `IBM_BOB/`
+- Legacy application not yet imported
+- Product implementation not yet started
+- No product dependencies installed
+
+## Documentation and evidence
+
+- `IBM_BOB/` is the only location for IBM Bob documentation and records.
+- `bob_sessions/` is the planned location for official IBM Bob session evidence when actual evidence is produced. It has not been created yet.
+- The local `.opencode/` directory is Nidhi's personal tooling, not IBM Bob documentation or product source.
+
+## Repository structure
+
+```text
 IBM-Bob-Hackathon/
-├── IBM_BOB/               # IBM Bob usage evidence and documentation
+├── IBM_BOB/               # IBM Bob documentation and records
 │   ├── BOB_USAGE.md
 │   ├── BOB_CHANGES.md
 │   └── BOB_PROMPTS.md
 ├── .gitignore             # Protects secrets, env files, and build artifacts
 └── README.md              # This file
 ```
-
----
 
 *IBM Bob 2.0 Hackathon — Team Codexmatrix*
