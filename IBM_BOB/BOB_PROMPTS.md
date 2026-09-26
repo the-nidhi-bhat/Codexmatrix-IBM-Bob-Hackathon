@@ -72,3 +72,52 @@ Record of important prompts/tasks given to IBM Bob and the resulting work perfor
 - Updated `BOB_PROMPTS.md` (this file) with this record
 
 **Outcome:** ✅ Correction recorded. Waiting for the actual hackathon problem statement/challenge.
+
+---
+
+## Prompt 003 — Legacy Analysis + Risk Assessment (Arati's task)
+
+**Date:** 2026-09-26  
+**Team member:** Arati (IBM Bob IDE)  
+**User Prompt Summary:**
+
+> Create a structured, evidence-based modernization analysis that the Legacy Code Whisperer product can use. Focus on legacy runtime/dependency risks, deprecated APIs, untested/high-risk behavior, affected files/modules, risk level and WHY, modernization opportunity, expected blast radius, relevant existing behavioral tests, and recommended modernization order. Keep it grounded in the real Get24 repository. Make it easy for the UI/backend to consume later. Do NOT modify the actual legacy application code, Nidhi's ASSESS.md/PLAN.md, or .opencode/.
+
+**Rules applied:**
+
+1. Do not modify any legacy application source code
+2. Do not modify ASSESS.md or PLAN.md (Nidhi/OpenCode work)
+3. Do not invent metrics, coverage percentages, or vulnerability scores
+4. Ground every finding in a specific file and line number
+5. Stage only the files I created; do not commit Nidhi's files
+6. Commit with a descriptive message; push to a named branch
+7. Record what IBM Bob actually did — not what it reviewed or read
+
+**Work Performed by IBM Bob:**
+
+- Pulled latest main and fetched all remote branches
+- Discovered `baseline/import-get24` branch (Nidhi's Get24 import)
+- Checked out legacy app files read-only to analyse without modifying
+- Performed full source inspection of all 11 application files
+- Cross-referenced existing `ASSESS.md` (22 findings) and `PLAN.md` (7 steps) — both by Nidhi/OpenCode, not modified
+- Analysed all 3 test files + test harness to understand the 18-test safety net in detail
+- Synthesised findings into two structured JSON artifacts:
+  - `legacy/get24-baseline/analysis/legacy-analysis.json`
+  - `legacy/get24-baseline/analysis/risk-report.json`
+- Verified no secrets in output; staged only the 2 intended files; committed and pushed
+
+**Resulting Files Created:**
+
+- `legacy/get24-baseline/analysis/legacy-analysis.json`
+- `legacy/get24-baseline/analysis/risk-report.json`
+
+**Files Explicitly NOT Modified:**
+
+- `ASSESS.md` (Nidhi/OpenCode)
+- `PLAN.md` (Nidhi/OpenCode)
+- `.opencode/` (not present on this machine; not touched)
+- All legacy application source files
+
+**Branch:** `arati/legacy-analysis`  
+**Commit:** `04176aa`  
+**Outcome:** ✅ Completed. Artifacts pushed. Stopping as instructed — no UI, backend, rollback, or code modernization work started.
