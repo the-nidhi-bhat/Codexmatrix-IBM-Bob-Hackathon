@@ -1,0 +1,86 @@
+/* ──────────────────────────────────────────────────
+   Legacy Code Whisperer — Global Styles
+   ────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb33;
+  --green: #3fb950;
+  --green-dim: #238636;
+  --yellow: #d29922;
+  --yellow-dim: #9e6a0333;
+  --red: #f85149;
+  --red-dim: #da363333;
+  --purple: #bc8cff;
+  --radius: 8px;
+  --font: -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* utility */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tag-high   { background: var(--red-dim);    color: var(--red);    border: 1px solid #da363355; }
+.tag-medium { background: var(--yellow-dim); color: var(--yellow); border: 1px solid #9e6a0355; }
+.tag-low    { background: var(--accent-dim); color: var(--accent); border: 1px solid #1f6feb55; }
+.tag-green  { background: #23863633;         color: var(--green);  border: 1px solid #23863655; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.mono {
+  font-family: "SF Mono", "Cascadia Mono", "Fira Code", monospace;
+  font-size: 12px;
+}
