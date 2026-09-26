@@ -1,4 +1,4 @@
-# Legacy Code Whisperer
+# Legacy Code Whisper
 
 **Team:** Codexmatrix
 
