@@ -11,6 +11,8 @@ validation runner and rollback tool.
 |---|---|
 | `last-result.json` | Result of the most-recently completed validation run |
 | `last-rollback.json` | Result of the most-recently completed rollback operation |
+| `last-checkpoint.json` | Result of the most-recently completed checkpoint (orchestration) run |
+| `cp-*-tmp.json` | Intermediate validation/rollback results of a checkpoint run |
 | `.gitkeep` | Keeps the directory tracked by Git before any runtime output is produced |
 
 All `*.json` files in this directory are `.gitignore`d — they are ephemeral
@@ -164,6 +166,155 @@ PASS / FAIL
 
 ---
 
+## Orchestration (`tools/checkpoint.js`)
+
+### Purpose
+
+> "Given a modernization commit that is already applied, did it preserve
+> behavior — and if not, can the workflow get back to a known-good state
+> without losing history?"
+
+`tools/checkpoint.js` connects the two tools above into the
+**Execute → Verify → Rollback → Recover** loop. It adds no validation logic and
+no Git logic of its own: it runs `tools/validate.js` and `tools/rollback.js` as
+child processes and reads their JSON results back.
+
+### Usage
+
+```bash
+node tools/checkpoint.js <commit> [--result-file validation/last-checkpoint.json]
+node tools/checkpoint.js --help
+```
+
+| Argument | Description |
+|---|---|
+| `<commit>` | The modernization commit to verify. It must already be applied and committed on the current branch. |
+| `--result-file <path>` | Write the JSON result here instead of the default `validation/last-checkpoint.json`. |
+
+### States
+
+| State | Meaning | Exit code |
+|---|---|---|
+| `VERIFIED` | Validation passed. The commit becomes the new known-good checkpoint. | 0 |
+| `VALIDATION_FAILED` | Validation failed **and** rollback was refused/failed. Manual intervention required. | 3 |
+| `RECOVERY_VERIFIED` | Validation failed, the commit was rolled back, and validation passed again. | 1 |
+| `RECOVERY_FAILED` | The commit was rolled back but validation still fails. The failure is not explained by that commit. | 2 |
+| `REFUSED` | A pre-condition failed. The repository was not modified. | 3 |
+
+`ROLLBACK_STARTED` and `ROLLED_BACK` are progress states: they are printed to
+the console and recorded in `rollbackResult.status`, but they are never final —
+a checkpoint always continues into recovery validation.
+
+### Flow
+
+```
+                       ┌──────────────────────────────┐
+                       │ 1. pre-flight safety checks  │──► REFUSED (exit 3)
+                       └──────────────┬───────────────┘
+                                      ▼
+                       ┌──────────────────────────────┐
+                       │ 2. VERIFYING                 │  tools/validate.js
+                       └──────────────┬───────────────┘
+                          PASS │              │ FAIL
+                               ▼              ▼
+                          VERIFIED      ┌────────────────────────────┐
+                          (exit 0)      │ 3. ROLLBACK_STARTED        │  tools/rollback.js
+                                         └─────────────┬──────────────┘
+                                          ROLLED_BACK │      │ REFUSED / FAILED
+                                                       ▼      ▼
+                                         ┌──────────────────┐  VALIDATION_FAILED
+                                         │ 4. RECOVERY      │  (exit 3)
+                                         │    VERIFYING     │  tools/validate.js
+                                         └────────┬─────────┘
+                                    PASS │              │ FAIL
+                                         ▼              ▼
+                              RECOVERY_VERIFIED   RECOVERY_FAILED
+                                 (exit 1)            (exit 2)
+```
+
+### Pre-flight safety checks (before anything runs)
+
+The tool refuses **without modifying the repository** and without running the
+test suite if:
+
+1. no commit was given;
+2. the working tree is not clean;
+3. the commit does not exist in this repository;
+4. the commit is not an ancestor of `HEAD` (the change is not applied yet);
+5. the commit is the validation/rollback infrastructure itself
+   (subject starting with `feat(validation):` or `feat(rollback):`) — rolling
+   back the safety net must be impossible from here.
+
+`tools/rollback.js` repeats checks 2–5 for its own operation, so the rollback
+inside a checkpoint is refused independently of this tool.
+
+### Result schema (`validation/last-checkpoint.json`)
+
+```json
+{
+  "status":              "VERIFIED | VALIDATION_FAILED | RECOVERY_VERIFIED | RECOVERY_FAILED | REFUSED",
+  "modernizationStep":   "<commit subject line>",
+  "startingCommit":      "<HEAD when the checkpoint started — equal to modernizationCommit, because the change is already applied>",
+  "modernizationCommit": "<full hash of the commit being verified>",
+  "branch":              "<current branch name>",
+  "validationResult":    "<tools/validate.js result object, or null if refused>",
+  "rollbackResult":      "<tools/rollback.js result object, or null when not needed>",
+  "recoveryValidation":  "<second tools/validate.js result object, or null>",
+  "finalStatus":         "<one-line human-readable explanation>",
+  "timestamp":           "<ISO-8601 timestamp>",
+  "runtimeNote":         "<server-restart note, set on the rollback paths>"
+}
+```
+
+Rollback status, rollback commit and rollback reason are **not duplicated** at
+the top level; read them from the nested objects the sub-tools already own:
+
+| What the UI needs | Where it is |
+|---|---|
+| validation status | `validationResult.status` |
+| total / passed / failed / skipped | `validationResult.total` / `.passed` / `.failed` / `.skipped` |
+| rollback status | `rollbackResult.status` (`ROLLED_BACK` / `REFUSED` / `FAILED`) |
+| rollback commit | `rollbackResult.revertCommit` |
+| rollback reason | `rollbackResult.reason` |
+| recovery status | `recoveryValidation.status` (+ counts) |
+| final workflow status | `status` |
+| human-readable summary | `finalStatus` |
+
+### Server restart limitation
+
+`git revert` restores source **files only**. It does not affect an
+already-running Node process. When validation runs through the Docker harness
+each suite starts a fresh server subprocess, so a restart is not needed and
+recovery validation always sees the rolled-back source. If the application is
+running on the host outside the harness, restart it before trusting a recovery
+run. `runtimeNote` in the result records this on every rollback path.
+
+### What this tool does NOT do
+
+- It does **not** apply a change. The modernization commit must already exist.
+- It does **not** push, merge, rebase, `reset --hard`, or force-push anything.
+- It does **not** modify `main`, and it does not check out branches.
+- It does **not** stash or discard a dirty working tree — it refuses.
+- It does **not** restart a running server.
+- It does **not** re-run or replace `tools/validate.js` / `tools/rollback.js`.
+- It does **not** retry or repair a failing modernization step; `RECOVERY_FAILED`
+  is a hand-off to a human, not a retry loop.
+- It is **not** a CI gate: it needs Docker on the host and takes minutes.
+
+### Checking the refusals
+
+```bash
+node tools/checkpoint.test.js
+```
+
+Six fast checks, no Docker and no repository mutation: usage, missing commit,
+dirty working tree, unknown commit, commit outside the branch history, and
+infrastructure protection. The two Docker-backed paths (VERIFIED and
+RECOVERY_VERIFIED) are verified by running the tool for real — the recorded
+results are in `bob_sessions/2026-09-26-execute-verify-rollback.md`.
+
+---
+
 ## Relationship between Validation and Rollback
 
 | Tool | Question it answers |
@@ -171,6 +322,9 @@ PASS / FAIL
 | `tools/validate.js` | Did the current code preserve the protected behavior? |
 | `tools/rollback.js` | How do we safely return to the last known-good state after a failure? |
 | `tools/validate.js` (again) | Did the rollback actually restore correct behavior? |
+| `tools/checkpoint.js` | Which of the three above should run now, and in which order? |
 
 These are three distinct operations. They must not be merged into a single
-opaque function.
+opaque function. `tools/checkpoint.js` only *sequences* them as child
+processes and reports their results; each tool keeps its own logic, its own
+result file and its own exit code.
