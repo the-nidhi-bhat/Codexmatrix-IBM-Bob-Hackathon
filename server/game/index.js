@@ -72,7 +72,7 @@ var Game = function (io) {
 				}
 			}
 			else if (res === -1) {
-				socket.emit('invalidExpr', {msg: 'BROKEN2: Must use all 4 digits.'});
+				socket.emit('invalidExpr', {msg: 'Must use all 4 digits.'});
 			}
 			else if (res === -2) {
 				socket.emit('invalidExpr', {msg: 'Legal operators are \'+-*/()\'.'});		
