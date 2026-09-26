@@ -1,13 +1,29 @@
 import { useWorkflow } from "../workflow/WorkflowContext";
 
 export default function VerificationScreen({ onRollback }: { onRollback?: () => void }) {
-  const { activeVerification, verificationMode, setVerificationMode, state } = useWorkflow();
-  const v = activeVerification;
+  const { state } = useWorkflow();
+  const v = state.checkpointResult;
+
+  if (!v) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Verification</h2>
+          <p style={{ color: "var(--muted)" }}>Safety Net: not run</p>
+        </div>
+        <div className="card" style={{ color: "var(--muted)" }}>
+          No checkpoint result has been received for this workflow.
+        </div>
+      </div>
+    );
+  }
 
   const passed  = v.tests.filter((t) => t.status === "passed").length;
   const failed  = v.tests.filter((t) => t.status === "failed").length;
   const skipped = v.tests.filter((t) => t.status === "skipped").length;
-  const overallPass = failed === 0;
+  const overallPass = v.tests.length > 0 && passed === v.tests.length;
+  const overallFail = failed > 0;
+  const resultColor = overallPass ? "var(--green)" : overallFail ? "var(--red)" : "var(--muted)";
 
   const stepTitle = state.plan.find((s) => s.id === v.stepId)?.title ?? `Step ${v.stepId}`;
 
@@ -20,85 +36,38 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
             Safety-net tests run after every modernization step.
           </p>
         </div>
-        {/* Scenario toggle + demo label */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ color: "var(--muted)", fontSize: 12 }}>Demo scenario:</span>
-          <button
-            onClick={() => setVerificationMode("pass")}
-            style={{
-              padding: "4px 12px",
-              borderRadius: 4,
-              border: `1px solid ${verificationMode === "pass" ? "var(--green)" : "var(--border)"}`,
-              background: verificationMode === "pass" ? "#23863622" : "transparent",
-              color: verificationMode === "pass" ? "var(--green)" : "var(--muted)",
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            PASS
-          </button>
-          <button
-            onClick={() => setVerificationMode("fail")}
-            style={{
-              padding: "4px 12px",
-              borderRadius: 4,
-              border: `1px solid ${verificationMode === "fail" ? "var(--red)" : "var(--border)"}`,
-              background: verificationMode === "fail" ? "var(--red-dim)" : "transparent",
-              color: verificationMode === "fail" ? "var(--red)" : "var(--muted)",
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            FAIL
-          </button>
-          <div
-            style={{
-              padding: "4px 10px",
-              background: "#9e6a0315",
-              border: "1px solid #9e6a0333",
-              borderRadius: 4,
-              fontSize: 11,
-              color: "var(--yellow)",
-              fontWeight: 600,
-            }}
-          >
-            Demo · mock data
-          </div>
-        </div>
       </div>
 
       {/* PASS / FAIL banner */}
       <div
         style={{
           padding: "16px 20px",
-          background: overallPass ? "#23863622" : "var(--red-dim)",
-          border: `2px solid ${overallPass ? "#23863666" : "#da363366"}`,
+          background: overallPass ? "#23863622" : overallFail ? "var(--red-dim)" : "var(--surface-2)",
+          border: `2px solid ${overallPass ? "#23863666" : overallFail ? "#da363366" : "var(--border)"}`,
           borderRadius: "var(--radius)",
           display: "flex",
           alignItems: "center",
           gap: 14,
         }}
       >
-        <span style={{ fontSize: 32, color: overallPass ? "var(--green)" : "var(--red)" }}>
-          {overallPass ? "✓" : "✗"}
+        <span style={{ fontSize: 32, color: resultColor }}>
+          {overallPass ? "✓" : overallFail ? "✗" : "—"}
         </span>
         <div>
           <div
             style={{
               fontSize: 18,
               fontWeight: 800,
-              color: overallPass ? "var(--green)" : "var(--red)",
+              color: resultColor,
             }}
           >
-            {overallPass ? "PASS — All safety-net tests passing" : "FAIL — Regression detected"}
+            {overallPass ? "PASS — All checkpoint tests passing" : overallFail ? "FAIL — Regression detected" : "INCOMPLETE — Result not conclusive"}
           </div>
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
             Step {v.stepId}: {stepTitle} · {v.suite} · {v.duration}
           </div>
         </div>
-        {!overallPass && onRollback && (
+        {overallFail && onRollback && (
           <button
             onClick={onRollback}
             style={{

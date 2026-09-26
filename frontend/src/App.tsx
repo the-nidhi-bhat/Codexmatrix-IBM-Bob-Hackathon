@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StartScreen from "./screens/StartScreen";
 import ArchitectureScreen from "./screens/ArchitectureScreen";
 import OverviewScreen from "./screens/OverviewScreen";
@@ -10,6 +10,7 @@ import RollbackScreen from "./screens/RollbackScreen";
 import ReportScreen from "./screens/ReportScreen";
 import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
 import type { WorkflowState } from "./workflow/types";
+import { analyzeRepository, WorkflowApiError } from "./api/workflowApi";
 import "./App.css";
 
 type Screen = "architecture" | "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
@@ -18,16 +19,14 @@ interface NavItem {
   id: Screen;
   label: string;
   icon: string;
-  badge?: string;
-  badgeColor?: string;
 }
 
 const NAV: NavItem[] = [
   { id: "architecture",   label: "Architecture",   icon: "⬡" },
   { id: "overview",      label: "Overview",      icon: "◈" },
-  { id: "risk",          label: "Risk",           icon: "⚠", badge: "2 high", badgeColor: "var(--red)" },
-  { id: "plan",          label: "Plan",           icon: "☰", badge: "3→",     badgeColor: "var(--yellow)" },
-  { id: "execution",     label: "Execution",      icon: "▶", badge: "live",   badgeColor: "var(--green)" },
+  { id: "risk",          label: "Risk",           icon: "⚠" },
+  { id: "plan",          label: "Plan",           icon: "☰" },
+  { id: "execution",     label: "Execution",      icon: "▶" },
   { id: "verification",  label: "Verification",   icon: "✔" },
   { id: "rollback",      label: "Rollback",       icon: "↺" },
   { id: "report",        label: "Report",         icon: "📋" },
@@ -48,7 +47,7 @@ const PHASE_LABELS: Record<Screen, string> = {
 
 function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: () => void }) {
   const { state } = useWorkflow();
-  const { safetyNet, repository, overallProgress } = state;
+  const { repository, overallProgress } = state;
 
   const [active, setActive] = useState<Screen>("overview");
 
@@ -100,21 +99,23 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
               {PHASE_LABELS[active]}
             </span>
           </span>
-          {/* Safety net badge — from workflow state */}
+          {/* Checkpoint results are distinct from repository analysis checks. */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 6,
               padding: "4px 10px",
-              background: safetyNet.failing === 0 ? "#23863622" : "var(--red-dim)",
-              border: `1px solid ${safetyNet.failing === 0 ? "#23863644" : "#da363344"}`,
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
               borderRadius: 20,
             }}
           >
-            <span style={{ color: safetyNet.failing === 0 ? "var(--green)" : "var(--red)", fontSize: 10 }}>●</span>
-            <span style={{ color: safetyNet.failing === 0 ? "var(--green)" : "var(--red)", fontSize: 12, fontWeight: 600 }}>
-              {safetyNet.passing}/{safetyNet.total} tests passing
+            <span style={{ color: "var(--muted)", fontSize: 10 }}>●</span>
+            <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600 }}>
+              {state.checkpointResult && state.checkpointResult.tests.length > 0
+                ? "Safety Net result received"
+                : "Safety Net: not run"}
             </span>
           </div>
           {/* Change repo */}
@@ -188,21 +189,6 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
             >
               <span style={{ fontSize: 13, width: 18, textAlign: "center" }}>{item.icon}</span>
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.badge && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    padding: "1px 5px",
-                    borderRadius: 10,
-                    background: item.badgeColor ? `${item.badgeColor}22` : "var(--surface-2)",
-                    color: item.badgeColor ?? "var(--muted)",
-                    border: `1px solid ${item.badgeColor ? `${item.badgeColor}44` : "var(--border)"}`,
-                    fontWeight: 600,
-                  }}
-                >
-                  {item.badge}
-                </span>
-              )}
             </button>
           ))}
 
@@ -218,7 +204,7 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
               <div style={{ color: "var(--text)", fontWeight: 600, marginBottom: 2 }}>
                 {repository.name}
               </div>
-              <div>{repository.runtime.split(" ")[0]} {repository.runtime.split(" ")[1]} → 18 LTS</div>
+              <div>{repository.runtime}</div>
               <div style={{ color: "var(--green)" }}>{overallProgress}% complete</div>
               <div style={{ color: "var(--muted)", marginTop: 4, fontSize: 9, opacity: 0.7 }}>
                 {repoUrl}
@@ -260,17 +246,26 @@ type AppPhase =
 
 export default function App() {
   const [phase, setPhase] = useState<AppPhase>({ kind: "start" });
+  const requestController = useRef<AbortController | null>(null);
+
+  useEffect(() => () => requestController.current?.abort(), []);
 
   async function handleStart(repoUrl: string) {
+    requestController.current?.abort();
+    const controller = new AbortController();
+    requestController.current = controller;
     setPhase({ kind: "loading", repoUrl });
     try {
-      const { analyzeRepository } = await import("./api/workflowApi");
-      const { workflow } = await analyzeRepository(repoUrl);
+      const { workflow } = await analyzeRepository(repoUrl, controller.signal);
+      if (controller.signal.aborted) return;
       setPhase({ kind: "dashboard", repoUrl, workflowState: workflow });
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       const message = err instanceof Error ? err.message : "Repository analysis failed.";
-      const code = (err as { code?: string }).code ?? "ANALYSIS_FAILED";
+      const code = err instanceof WorkflowApiError ? err.code : "ANALYSIS_FAILED";
       setPhase({ kind: "error", repoUrl, message, code });
+    } finally {
+      if (requestController.current === controller) requestController.current = null;
     }
   }
 
@@ -296,7 +291,11 @@ export default function App() {
   // phase.kind === "dashboard"
   return (
     <WorkflowProvider state={phase.workflowState}>
-      <Dashboard repoUrl={phase.repoUrl} onChangeRepo={() => setPhase({ kind: "start" })} />
+      <Dashboard repoUrl={phase.repoUrl} onChangeRepo={() => {
+        requestController.current?.abort();
+        requestController.current = null;
+        setPhase({ kind: "start" });
+      }} />
     </WorkflowProvider>
   );
 }

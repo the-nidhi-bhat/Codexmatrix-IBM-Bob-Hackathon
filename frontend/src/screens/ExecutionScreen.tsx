@@ -1,32 +1,25 @@
-import React, { useState, useEffect } from "react";
+import type { CSSProperties } from "react";
 import { useWorkflow } from "../workflow/WorkflowContext";
 
-const FINAL_LOG_LINE = { time: "10:42:13", text: "✓ All 27 tests passed. Step complete." };
-const FAIL_LOG_LINE  = { time: "10:42:13", text: "✗ 1 test failed — regression detected. Initiating rollback…" };
+const EXECUTION_STATUS: Record<string, { label: string; color: string }> = {
+  not_available: { label: "Execution not available", color: "var(--muted)" },
+  running: { label: "Running", color: "var(--yellow)" },
+  complete: { label: "Complete", color: "var(--green)" },
+  failed: { label: "Failed", color: "var(--red)" },
+};
 
 export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: () => void; onRollback?: () => void }) {
   const { state } = useWorkflow();
   const { execution, plan } = state;
-  const currentStep = plan.find((s) => s.id === execution.currentStepId) ?? plan[0];
-
-  const [visibleLines, setVisibleLines] = useState(0);
-  const [done, setDone] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (visibleLines < execution.log.length) {
-      const t = setTimeout(() => setVisibleLines((v) => v + 1), 420);
-      return () => clearTimeout(t);
-    } else if (!done) {
-      const t = setTimeout(() => setDone(true), 800);
-      return () => clearTimeout(t);
-    }
-  }, [visibleLines, done, execution.log.length]);
-
-  const shownLines = execution.log.slice(0, visibleLines);
-  const finalLine = done ? (failed ? FAIL_LOG_LINE : FINAL_LOG_LINE) : null;
-
-  const step = currentStep;
+  const step = plan.find((item) => item.id === execution.currentStepId);
+  const checkpoint = state.checkpointResult?.tests.length ? state.checkpointResult : undefined;
+  const status = checkpoint
+    ? EXECUTION_STATUS[execution.status] ?? { label: "Unknown status", color: "var(--muted)" }
+    : { label: "Execution: not available", color: "var(--muted)" };
+  const passed = checkpoint?.tests.filter((test) => test.status === "passed").length ?? 0;
+  const failed = checkpoint?.tests.filter((test) => test.status === "failed").length ?? 0;
+  const skipped = checkpoint?.tests.filter((test) => test.status === "skipped").length ?? 0;
+  const allPassed = Boolean(checkpoint && passed === checkpoint.tests.length);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -34,29 +27,16 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Execution</h2>
           <p style={{ color: "var(--muted)" }}>
-            IBM Bob is applying changes in real time.
+            <span style={{ color: status.color, fontWeight: 600 }}>{status.label}</span>
           </p>
         </div>
-        {/* Toggle to simulate pass/fail */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            onClick={() => { setDone(false); setFailed(false); setVisibleLines(0); }}
-            style={btnStyle("var(--accent)")}
-          >
-            ↺ Replay
-          </button>
-          <button
-            onClick={() => { setFailed((f) => !f); }}
-            style={btnStyle(failed ? "var(--green)" : "var(--red)")}
-          >
-            {failed ? "Simulate Pass" : "Simulate Failure"}
-          </button>
-          {done && !failed && onVerify && (
+          {checkpoint && failed === 0 && onVerify && (
             <button onClick={onVerify} style={btnStyle("var(--green)")}>
               View Verification →
             </button>
           )}
-          {failed && done && onRollback && (
+          {checkpoint && failed > 0 && onRollback && (
             <button onClick={onRollback} style={btnStyle("var(--yellow)")}>
               View Rollback →
             </button>
@@ -68,20 +48,26 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
       <div
         style={{
           padding: "14px 18px",
-          background: "#9e6a0322",
-          border: "1px solid #9e6a0355",
+          background: checkpoint && execution.status === "running" ? "#9e6a0322" : "var(--surface-2)",
+          border: `1px solid ${checkpoint && execution.status === "running" ? "#9e6a0355" : "var(--border)"}`,
           borderRadius: "var(--radius)",
           display: "flex",
           gap: 12,
           alignItems: "center",
         }}
       >
-        <span style={{ fontSize: 20, color: "var(--yellow)" }}>⟳</span>
+        <span style={{ fontSize: 20, color: status.color }}>●</span>
         <div>
-          <div style={{ fontWeight: 700, color: "var(--yellow)" }}>
-            Step {step.id} — {step.title}
-          </div>
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>{step.description}</div>
+          {step ? (
+            <>
+              <div style={{ fontWeight: 700, color: status.color }}>
+                Step {step.id} — {step.title}
+              </div>
+              <div style={{ color: "var(--muted)", fontSize: 13 }}>{step.description}</div>
+            </>
+          ) : (
+            <div style={{ color: "var(--muted)" }}>No active execution step.</div>
+          )}
         </div>
       </div>
 
@@ -105,28 +91,14 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
               gap: 4,
             }}
           >
-            {shownLines.map((line, i) => (
+            {(checkpoint && execution.status !== "not_available" ? execution.log : []).map((line, i) => (
               <div key={i} style={{ display: "flex", gap: 10, lineHeight: 1.7 }}>
                 <span style={{ color: "var(--muted)", flexShrink: 0 }}>{line.time}</span>
                 <span style={{ color: "var(--text)" }}>{line.text}</span>
               </div>
             ))}
-            {finalLine && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  lineHeight: 1.7,
-                  color: finalLine.text.startsWith("✓") ? "var(--green)" : "var(--red)",
-                  fontWeight: 700,
-                }}
-              >
-                <span style={{ flexShrink: 0 }}>{finalLine.time}</span>
-                <span>{finalLine.text}</span>
-              </div>
-            )}
-            {!done && visibleLines === execution.log.length && (
-              <span style={{ color: "var(--muted)", animation: "pulse 1s infinite" }}>▌</span>
+            {!checkpoint && (
+              <span style={{ color: "var(--muted)" }}>Execution: not available</span>
             )}
           </div>
         </div>
@@ -158,34 +130,18 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
           {/* Test status */}
           <div
             className="card"
-            style={{
-              border: !done
-                ? "1px solid var(--border)"
-                : finalLine?.text.startsWith("✓")
-                ? "1px solid #23863655"
-                : "1px solid #da363355",
-            }}
+            style={{ border: "1px solid var(--border)" }}
           >
             <div className="section-title">Safety Net Tests</div>
-            {state.safetyNet.total === 0 ? (
-              <div style={{ color: "var(--muted)" }}>
-                Not run — this session analyzed the repository only. The 18-test safety net runs
-                through <code>tools/checkpoint.js</code>.
-              </div>
-            ) : !done ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--yellow)" }}>
-                <span style={{ fontSize: 18 }}>⟳</span>
-                <span>Running {state.safetyNet.total} tests…</span>
-              </div>
-            ) : finalLine?.text.startsWith("✓") ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--green)" }}>
-                <span style={{ fontSize: 18 }}>✓</span>
-                <span style={{ fontWeight: 700 }}>{state.safetyNet.total}/{state.safetyNet.total} passed</span>
+            {checkpoint ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, color: failed ? "var(--red)" : allPassed ? "var(--green)" : "var(--muted)" }}>
+                <span style={{ fontSize: 18 }}>{failed ? "✗" : allPassed ? "✓" : "—"}</span>
+                <span style={{ fontWeight: 700 }}>{passed} passed, {failed} failed, {skipped} skipped</span>
               </div>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--red)" }}>
-                <span style={{ fontSize: 18 }}>✗</span>
-                <span style={{ fontWeight: 700 }}>2 tests failed — regression</span>
+              <div style={{ color: "var(--muted)" }}>
+                Safety Net: not run — this session analyzed the repository only. The 18-test safety
+                net runs through <code>tools/checkpoint.js</code>.
               </div>
             )}
           </div>
@@ -195,7 +151,7 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
   );
 }
 
-function btnStyle(borderColor: string): React.CSSProperties {
+function btnStyle(borderColor: string): CSSProperties {
   return {
     padding: "6px 14px",
     borderRadius: "var(--radius)",

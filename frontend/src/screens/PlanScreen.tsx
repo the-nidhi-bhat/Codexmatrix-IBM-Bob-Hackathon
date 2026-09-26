@@ -1,8 +1,8 @@
 import { useState } from "react";
-import type { PlanStep, StepStatus } from "../workflow/types";
+import type { PlanStep } from "../workflow/types";
 import { useWorkflow } from "../workflow/WorkflowContext";
 
-const STATUS_CONFIG: Record<StepStatus, { icon: string; color: string; label: string }> = {
+const STATUS_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
   pending:     { icon: "○", color: "var(--muted)",   label: "Pending" },
   running:     { icon: "⟳", color: "var(--yellow)",  label: "Executing" },
   passed:      { icon: "✓", color: "var(--green)",   label: "Completed" },
@@ -31,7 +31,7 @@ function StepRow({ step, isLast, selected, onSelect }: {
   selected: boolean;
   onSelect: () => void;
 }) {
-  const cfg = STATUS_CONFIG[step.status];
+  const cfg = STATUS_CONFIG[step.status] ?? { icon: "○", color: "var(--muted)", label: "Unknown" };
 
   return (
     <div>

@@ -1,18 +1,62 @@
 import { Fragment, useState } from "react";
 import { useWorkflow } from "../workflow/WorkflowContext";
-import type { RollbackTimelineStatus } from "../workflow/types";
 
-const TIMELINE_CONFIG: Record<RollbackTimelineStatus, { icon: string; color: string; bg: string }> = {
+const TIMELINE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
   regression: { icon: "✗", color: "var(--red)",    bg: "var(--red-dim)" },
   rollback:   { icon: "↺", color: "var(--yellow)", bg: "var(--yellow-dim)" },
   restored:   { icon: "✓", color: "var(--green)",  bg: "#23863633" },
+  unknown:    { icon: "?", color: "var(--muted)",  bg: "var(--surface-2)" },
+};
+
+const ROLLBACK_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  pending: { label: "Pending", color: "var(--muted)" },
+  running: { label: "Running", color: "var(--yellow)" },
+  complete: { label: "Complete", color: "var(--green)" },
+  failed: { label: "Failed", color: "var(--red)" },
+  not_triggered: { label: "not triggered", color: "var(--muted)" },
+};
+
+const RECOVERY_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  pending: { label: "Pending", color: "var(--muted)" },
+  running: { label: "Running", color: "var(--yellow)" },
+  passed: { label: "Passed", color: "var(--green)" },
+  failed: { label: "Failed", color: "var(--red)" },
+  not_run: { label: "not run", color: "var(--muted)" },
 };
 
 export default function RollbackScreen() {
   const { state } = useWorkflow();
   const rb = state.rollback;
-
   const [step, setStep] = useState(0);
+  const rollbackStatus = ROLLBACK_STATUS_CONFIG[rb.rollbackStatus] ?? { label: "Unknown status", color: "var(--muted)" };
+  const recoveryStatus = RECOVERY_STATUS_CONFIG[rb.recoveryValidation] ?? { label: "Unknown status", color: "var(--muted)" };
+
+  if (!ROLLBACK_STATUS_CONFIG[rb.rollbackStatus]) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Rollback</h2>
+        <div className="card" style={{ display: "flex", gap: 24, flexWrap: "wrap", color: "var(--muted)" }}>
+          <span>Rollback: {rollbackStatus.label}</span>
+          <span>Recovery: {recoveryStatus.label}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (rb.rollbackStatus === "not_triggered") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Rollback</h2>
+          <p style={{ color: "var(--muted)" }}>No rollback has been triggered for this workflow.</p>
+        </div>
+        <div className="card" style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          <span style={{ color: rollbackStatus.color }}>Rollback: {rollbackStatus.label}</span>
+          <span style={{ color: recoveryStatus.color }}>Recovery: {recoveryStatus.label}</span>
+        </div>
+      </div>
+    );
+  }
 
   const totalSteps = rb.timeline.length;
 
@@ -24,14 +68,14 @@ export default function RollbackScreen() {
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Rollback</h2>
           <p style={{ color: "var(--muted)" }}>
-            A regression was detected — watch the automated safety recovery.
+            Rollback and recovery status from this workflow.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setStep(0)} style={btnStyle("var(--muted)")}>Reset</button>
           {step < totalSteps && (
             <button onClick={() => setStep((s) => s + 1)} style={btnStyle("var(--accent)")}>
-              {step === 0 ? "▶ Start Demo" : "Next →"}
+              {step === 0 ? "▶ Start Timeline" : "Next →"}
             </button>
           )}
         </div>
@@ -64,14 +108,14 @@ export default function RollbackScreen() {
         <div style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
           <span style={{ fontSize: 12 }}>
             <span style={{ color: "var(--muted)" }}>Rollback:  </span>
-            <span style={{ color: rb.rollbackStatus === "complete" ? "var(--green)" : "var(--yellow)", fontWeight: 600 }}>
-              {rb.rollbackStatus}
+            <span style={{ color: rollbackStatus.color, fontWeight: 600 }}>
+              {rollbackStatus.label}
             </span>
           </span>
           <span style={{ fontSize: 12 }}>
             <span style={{ color: "var(--muted)" }}>Recovery:  </span>
-            <span style={{ color: rb.recoveryValidation === "passed" ? "var(--green)" : "var(--yellow)", fontWeight: 600 }}>
-              {rb.recoveryValidation}
+            <span style={{ color: recoveryStatus.color, fontWeight: 600 }}>
+              {recoveryStatus.label}
             </span>
           </span>
         </div>
@@ -80,7 +124,7 @@ export default function RollbackScreen() {
       {/* Main timeline */}
       <div className="card" style={{ display: "flex", gap: 0 }}>
         {rb.timeline.map((item, idx) => {
-          const cfg = TIMELINE_CONFIG[item.status as RollbackTimelineStatus];
+          const cfg = TIMELINE_CONFIG[item.status] ?? TIMELINE_CONFIG.unknown;
           const active = idx < step;
           const current = idx === step - 1;
           return (
@@ -198,7 +242,7 @@ export default function RollbackScreen() {
       )}
 
       {/* Bob's explanation — show after step 3 */}
-      {step >= 3 && (
+      {rb.rollbackStatus === "complete" && rb.recoveryValidation === "passed" && (
         <div
           className="card"
           style={{ border: "1px solid #23863655", animation: "fadeIn 0.3s ease" }}
@@ -223,7 +267,7 @@ export default function RollbackScreen() {
       )}
 
       {/* Restored state notice */}
-      {step >= 3 && (
+      {rb.rollbackStatus === "complete" && rb.recoveryValidation === "passed" && (
         <div
           className="card"
           style={{
@@ -241,7 +285,7 @@ export default function RollbackScreen() {
               Repository restored to commit {rb.previousCommit}
             </div>
             <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
-              Recovery validation: {rb.recoveryValidation} · {state.safetyNet.total}/{state.safetyNet.total} tests passing — ready for next attempt
+              Recovery validation: {recoveryStatus.label}
             </div>
           </div>
         </div>
