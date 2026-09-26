@@ -167,7 +167,12 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
             }}
           >
             <div className="section-title">Safety Net Tests</div>
-            {!done ? (
+            {state.safetyNet.total === 0 ? (
+              <div style={{ color: "var(--muted)" }}>
+                Not run — this session analyzed the repository only. The 18-test safety net runs
+                through <code>tools/checkpoint.js</code>.
+              </div>
+            ) : !done ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--yellow)" }}>
                 <span style={{ fontSize: 18 }}>⟳</span>
                 <span>Running {state.safetyNet.total} tests…</span>

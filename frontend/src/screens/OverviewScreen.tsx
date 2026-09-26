@@ -17,6 +17,32 @@ function ProgressBar({ value }: { value: number }) {
 }
 
 function SafetyNetBadge({ passing, total, generatedBy }: { passing: number; total: number; generatedBy: string }) {
+  // total 0 means no safety net has run for this repository yet (analysis only).
+  // Showing "0/0 tests passing" with a green tick would claim a test run that
+  // never happened, so say what is actually true instead.
+  if (total === 0) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "14px 18px",
+          background: "var(--surface-2)",
+          border: `1px solid var(--border)`,
+          borderRadius: "var(--radius)",
+        }}
+      >
+        <span style={{ fontSize: 24 }}>○</span>
+        <div>
+          <div style={{ fontWeight: 700, color: "var(--muted)", fontSize: 16 }}>
+            Safety Net: not run
+          </div>
+          <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>{generatedBy}</div>
+        </div>
+      </div>
+    );
+  }
   const allPass = passing === total;
   return (
     <div

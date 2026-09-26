@@ -5,8 +5,9 @@
 //  Understand → Protect → Assess → Plan → Execute → Verify → Rollback → Recover → Report
 //
 //  Screens must read data from WorkflowContext (which conforms to these types).
-//  Mock data is provided by mockWorkflow.ts and can be replaced by a real
-//  backend provider without changing the screens or this type file.
+//  Workflow state comes from the backend (POST /api/analyze) via
+//  src/api/workflowApi.ts; it mirrors backend/src/types.ts, so swapping the
+//  backend provider does not change the screens or this type file.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Shared primitives ────────────────────────────────────────────────────────
@@ -89,6 +90,8 @@ export interface FileChange {
 
 export interface ExecutionState {
   currentStepId: number;
+  /** "not_available" = nothing has been executed for this run (analysis only). */
+  status: "not_available" | "running" | "complete" | "failed";
   log: ActivityLogEntry[];
   filesChanged: FileChange[];
 }
@@ -148,9 +151,9 @@ export interface RollbackEvent {
   /** Commit hash of the failing change (to be reverted) */
   failedCommit: string;
   /** Status of the rollback itself */
-  rollbackStatus: "pending" | "running" | "complete" | "failed";
+  rollbackStatus: "pending" | "running" | "complete" | "failed" | "not_triggered";
   /** Status of the verification run that confirmed recovery */
-  recoveryValidation: "pending" | "running" | "passed" | "failed";
+  recoveryValidation: "pending" | "running" | "passed" | "failed" | "not_run";
   /** Bob's root-cause explanation */
   bobExplanation: string;
   /** Safer alternative suggested by Bob */

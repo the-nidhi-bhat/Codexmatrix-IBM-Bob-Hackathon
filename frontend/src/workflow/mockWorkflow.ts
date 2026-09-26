@@ -283,6 +283,7 @@ export function buildMockWorkflowState(repoUrl: string): WorkflowState {
 
     execution: {
       currentStepId: 3,
+      status: "running",
       log: [
         { time: "10:42:01", text: "IBM Bob: Analyzing src/routes/orders.js…" },
         { time: "10:42:03", text: "IBM Bob: Found 14 var declarations in 63 lines." },

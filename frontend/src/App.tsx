@@ -9,6 +9,7 @@ import VerificationScreen from "./screens/VerificationScreen";
 import RollbackScreen from "./screens/RollbackScreen";
 import ReportScreen from "./screens/ReportScreen";
 import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
+import type { WorkflowState } from "./workflow/types";
 import "./App.css";
 
 type Screen = "architecture" | "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
@@ -247,18 +248,55 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
   );
 }
 
+// ── App state machine ─────────────────────────────────────────────────────────
+
+type AppPhase =
+  | { kind: "start" }
+  | { kind: "loading"; repoUrl: string }
+  | { kind: "error"; repoUrl: string; message: string; code: string }
+  | { kind: "dashboard"; repoUrl: string; workflowState: WorkflowState };
+
 // ── Root App — entry gate + provider ─────────────────────────────────────────
 
 export default function App() {
-  const [repoUrl, setRepoUrl] = useState<string | null>(null);
+  const [phase, setPhase] = useState<AppPhase>({ kind: "start" });
 
-  if (!repoUrl) {
-    return <StartScreen onStart={(url) => setRepoUrl(url)} />;
+  async function handleStart(repoUrl: string) {
+    setPhase({ kind: "loading", repoUrl });
+    try {
+      const { analyzeRepository } = await import("./api/workflowApi");
+      const { workflow } = await analyzeRepository(repoUrl);
+      setPhase({ kind: "dashboard", repoUrl, workflowState: workflow });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Repository analysis failed.";
+      const code = (err as { code?: string }).code ?? "ANALYSIS_FAILED";
+      setPhase({ kind: "error", repoUrl, message, code });
+    }
   }
 
+  if (phase.kind === "start") {
+    return <StartScreen onStart={handleStart} />;
+  }
+
+  if (phase.kind === "loading") {
+    return <StartScreen onStart={handleStart} loading repoUrl={phase.repoUrl} />;
+  }
+
+  if (phase.kind === "error") {
+    return (
+      <StartScreen
+        onStart={handleStart}
+        errorMessage={phase.message}
+        errorCode={phase.code}
+        defaultUrl={phase.repoUrl}
+      />
+    );
+  }
+
+  // phase.kind === "dashboard"
   return (
-    <WorkflowProvider repoUrl={repoUrl}>
-      <Dashboard repoUrl={repoUrl} onChangeRepo={() => setRepoUrl(null)} />
+    <WorkflowProvider state={phase.workflowState}>
+      <Dashboard repoUrl={phase.repoUrl} onChangeRepo={() => setPhase({ kind: "start" })} />
     </WorkflowProvider>
   );
 }
