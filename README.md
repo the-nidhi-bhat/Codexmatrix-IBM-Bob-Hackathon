@@ -54,9 +54,6 @@ IBM Bob is intended to be a core part of the final solution. Potential Bob respo
 
 These are planned responsibilities, not capabilities that are already implemented or measured.
 
-## OpenCode
-
-OpenCode is Nidhi's personal development tool and is separate from IBM Bob. Work performed with OpenCode is not recorded as an IBM Bob contribution.
 
 ## Current status
 
