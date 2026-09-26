@@ -49,7 +49,7 @@ export default function StartScreen({ onStart }: StartScreenProps) {
     onStart(trimmed);
   }
 
-  function useExample(repo: string) {
+  function selectExample(repo: string) {
     setUrl(repo);
     setError("");
   }
@@ -230,7 +230,7 @@ export default function StartScreen({ onStart }: StartScreenProps) {
                       <button
                         key={repo}
                         type="button"
-                        onClick={() => useExample(repo)}
+                        onClick={() => selectExample(repo)}
                         className="mono"
                         style={{
                           background: "transparent",
