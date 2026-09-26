@@ -1,3 +1,4 @@
 node_modules
 
 validation/last-result.json
+validation/last-rollback.json
