@@ -1,25 +1,23 @@
-# Legacy Analysis + Risk Review — Get24
+# Legacy Analysis + Risk Review — Get24 (v2)
 ### Legacy Code Whisperer · Team Codexmatrix · IBM Bob 2.0 Hackathon
 
 **Author:** Arati (Legacy Analysis + Risk role) — IBM Bob IDE  
-**Branch:** `arati/risk-analysis` (based on `baseline/import-get24`)  
-**Baseline commit:** `3889bec` (Step 2 — uuid applied)  
+**Branch:** `arati/risk-analysis`  
+**Baseline commit for this revision:** `97ca37f` (v1 analysis) → improved in this commit  
 **Steps already applied at this revision:** Step 1 (F-18 type guard), Step 2 (node-uuid → uuid@9.0.1)  
-**Reference:** [`ASSESS.md`](../../ASSESS.md) (Nidhi/OpenCode) · [`PLAN.md`](../../PLAN.md) (Nidhi/OpenCode)  
+**Reference:** [`ASSESS.md`](../../ASSESS.md) · [`PLAN.md`](../../PLAN.md)  
 **Safety net:** 18/18 tests — not touched by this document
 
-> This document is a **code-verified supplement** to the existing `ASSESS.md`.
-> It adds per-finding code evidence (exact file + line), step-status tracking,
-> test-harness impact analysis for the two highest-risk remaining steps,
-> and a prioritised risk table for the work that still lies ahead.
-> It does not repeat information that ASSESS.md already covers accurately.
+> **v2 improvements over v1:** Added new findings (F-23 through F-28) not covered
+> by ASSESS.md or PLAN.md, expanded the `validate()` logic analysis with additional
+> edge cases, refined the harness break-point table with exact required replacements,
+> updated the Step 5 section to reflect the favicon resolution now in PLAN.md,
+> and added a concrete concurrency race scenario with step-by-step trace.
 > No production code is modified.
 
 ---
 
 ## 1. Current State After Steps 1 and 2
-
-The two lowest-risk findings have been resolved. This section records exactly what changed so the test harness and the demo narrative stay accurate.
 
 ### Step 1 — F-18 resolved: `validate()` type guard ✅
 
@@ -30,7 +28,7 @@ socket.on('submitExpression', function (data) {
     if (typeof data.expression !== 'string') return;   // ← added by Step 1
     var res = validate(data.expression);
 ```
-**Behavioral impact:** A malformed client payload (missing or non-string `expression`) now returns silently instead of crashing the handler with a TypeError at `temp.search()` (line 95). All 18 safety net tests pass unchanged.
+**Behavioral impact:** A malformed socket payload (missing or non-string `expression`) returns silently instead of crashing `temp.search()` on line 95 with a TypeError. All 18 safety net tests pass unchanged.
 
 ---
 
@@ -50,41 +48,45 @@ var gameId = uuidv4();
 // package.json line 12
 "uuid": "9.0.1"
 ```
-**Behavioral impact:** UUID v4 format is identical. `socket.test.js` UUID_V4 regex assertion (`/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`) still passes. All 18 tests pass unchanged.
+**Note:** `legacy/get24-baseline/repro/LEGACY_NPM_LS.txt` still shows `node-uuid@1.4.8` — this is expected. That file captures the resolved legacy dependency tree at baseline (before Step 2). It is a historical record, not a current snapshot.
 
 ---
 
 ## 2. Remaining Open Findings — Code Evidence
 
-For each finding still open, this section provides the exact code location so any developer can verify the risk claim without reading the whole file.
-
----
-
 ### F-12 — `node-expression-eval@0.1.x` unmaintained · **MEDIUM risk** · Step 3
 
-**File:** [`server/game/index.js`](../../server/game/index.js) lines 12 and 66  
+**File:** [`server/game/index.js`](../../server/game/index.js) lines 12, 66–71  
 **Evidence:**
 ```js
 // line 12 — still the unmaintained package
 var parser = require('node-expression-eval');
 
-// line 66 — the call that must survive the replacement
+// lines 66–71 — the call site and its try/catch
 try { data.evaluated = parser.evaluate(data.expression); }
 catch(e) {
     passedEval = false;
     socket.emit('invalidExpr', {msg: 'Invalid.'});
+} finally {
+    if (passedEval) emitEvaluation(socket, data);
 }
 ```
-**Why it matters:** `node-expression-eval@0.1.0` was published in 2013 and has no releases since. It has no verifiable CVE history because it is too obscure to appear in advisory databases. The replacement (`expr-eval@2.x`) is the maintained continuation of the same arithmetic-evaluator codebase.
+**Why it matters:** `node-expression-eval@0.1.0` was published once in 2013 with no subsequent releases. The `expr-eval@2.x` replacement is the maintained continuation of the same arithmetic-evaluator codebase (same algorithm, same operator precedence). The risk is not in the replacement itself but in any edge-case difference between the two implementations.
 
-**Regression risk — specific to this code:** The `try/catch` wraps only the `parser.evaluate()` call. If `expr-eval` throws a different error class or a string (not an `Error` object), the catch still fires and the behavior is preserved. The real risk is operator-precedence or whitespace handling differences.
+**Specific regression risks for Step 3:**
+
+| Expression | Card | Expected result | Why it could differ |
+|------------|------|-----------------|---------------------|
+| `1+3+4+7` | `1347` | `evaluatedExpr { evaluated: 15 }` | Standard arithmetic — identical in both packages |
+| `7*4-3-1` | `1347` | `evaluatedExpr { evaluated: 24 }` → roundOver `win` | Operator precedence `*` before `-` — identical in both |
+| `(1+3+4+7` | `1347` | `invalidExpr { msg: 'Invalid.' }` | Both throw on unmatched paren — behavior preserved by `try/catch` regardless of error type |
+| `1/(3-3)+4+7` | `1347` | `invalidExpr { msg: 'Invalid.' }` (division by zero) | Both throw — protected by `try/catch`, **no test covers this** |
+| `1 + 3 + 4 + 7` | `1347` | `evaluatedExpr { evaluated: 15 }` | Whitespace handling may differ — **no test with spaces** |
 
 **Tests that protect this change:**
-- `game-events.test.js` — "a valid non-winning expression produces evaluatedExpr" → `data.evaluated === 15` for `1+3+4+7`
-- `game-events.test.js` — "a winning expression ends the round" → `data.evaluated === 24` for `7*4-3-1`
-- `game-events.test.js` — "an unparseable but legal-character expression produces invalidExpr 'Invalid.'" → `(1+3+4+7` (unmatched paren) must still reach the catch block
-
-**What has no test coverage:** Division by zero (e.g. `1/(3-3)+4+7`). Both `node-expression-eval` and `expr-eval` will throw, but the error message in `invalidExpr` is `'Invalid.'` — as long as the catch fires, behavior is preserved. No test asserts this case.
+- `game-events.test.js` — "a valid non-winning expression" → `evaluated === 15`
+- `game-events.test.js` — "a winning expression ends the round" → `evaluated === 24`
+- `game-events.test.js` — "an unparseable but legal-character expression produces invalidExpr 'Invalid.'"
 
 ---
 
@@ -97,12 +99,23 @@ catch(e) {
 // index.js line 1 — require triggers HTTP bind immediately
 var server = require('./server');
 
-// server/index.js lines 43–44 — the side-effect
+// server/index.js lines 43–44 — the side-effect: listen() called at module load time
 var server = http.createServer(app).listen(app.get('port'), function() {
     console.log('\nExpress server listening port ' + app.get('port') + '\n');
 });
 ```
-**Why it matters:** Every test in the safety net works around this by spawning a separate child process (`child_process.spawn` in `harness.js` line 129). This adds ~200–500 ms of startup overhead per test and prevents parallel test execution. After Step 4 (server start decoupling), the harness could switch to `require`-based startup, eliminating the spawn cost.
+**Why it matters:** Every test in the safety net works around this by spawning a separate child process (`child_process.spawn` in `harness.js` line 129). This prevents in-process test control and requires the 20-second startup timeout.
+
+**Ordering invariant for Step 4:** Socket.IO must be attached **before** `listen()` resolves — or at minimum before any connection arrives. In the current code both happen synchronously in the same script tick, so there is no race. After Step 4, the `start()` function must maintain this ordering:
+
+```
+// correct — Socket.IO attached before listen completes
+var server = http.createServer(app);
+var io = require('socket.io')(server, { ... });
+server.listen(port, callback);
+```
+
+If Socket.IO is attached *after* the `listen()` callback fires, a fast-connecting client could arrive before `io.sockets.on('connection', ...)` is registered, and the event would be silently dropped.
 
 **Harness evidence — current workaround:**
 ```js
@@ -111,45 +124,46 @@ var proc = spawn(process.execPath, ['-r', PRELOAD, path.join(APP_DIR, 'index.js'
     cwd: APP_DIR, env: env, stdio: ['ignore', 'pipe', 'pipe']
 });
 ```
-**Regression risk specific to this code:** After decoupling, `index.js` must call `require('./server').start()` and the `start()` function must attach Socket.IO listeners *before* calling `listen`. If Socket.IO is attached *after* `listen` there is a race window where a connection arrives before handlers are registered. The current code is sequential (both happen in the same synchronous block) and that ordering must be preserved exactly.
 
 ---
 
-### F-14 — Global mutable `gameList` and `numConnections` · **MEDIUM risk** · Step 4 / future
+### F-14 — Global mutable `gameList` and `numConnections` · **MEDIUM risk** · Future phase
 
 **File:** [`server/index.js`](../../server/index.js) lines 25–26  
 **Evidence:**
 ```js
-/** List of stored game obects and global connection counter */
 var gameList = [];
 var numConnections = 0;
 ```
-**Why it matters:** These are module-level variables. Once the server module is required, they persist for the lifetime of the process. There is no API to reset them. The test harness works around this by spawning a fresh process per test (so a clean module is loaded each time). After Step 4 decoupling, if a test suite starts and stops the server in-process, these globals will accumulate across tests unless explicitly reset or encapsulated.
 
-**Also noted:** `numConnections` is decremented in the global `socket.on('disconnect')` handler (line 84) and incremented in `accept()` (line 92). `gameList` is never pruned — completed or empty games remain in the array forever. Under long-running load this is a memory leak, but it is pre-existing behavior that the safety net does not test for.
+**`numConnections` analysis:** Incremented in `accept()` (line 92) and decremented in the global `socket.on('disconnect')` handler (line 84). The decrement is in `server/index.js`, not inside the `Game` class. The `Game` class also has its own `socket.on('disconnect')` handler (line 55 of `game/index.js`) that decrements `playerCount`. These are two separate handlers on the same socket — both fire on disconnect. This is correct and intentional, but it means `numConnections` and `playerCount` are decremented independently.
 
-**Test coverage note:** The capacity test (`game-events.test.js` line 177) exercises the `numConnections` logic. It works only because each test gets a fresh server process where `numConnections` starts at 0.
+**`gameList` analysis:** Games are added to the list (`push`) on lines 62 and 78, but **never removed**. When all players leave a game, `playerCount` drops to 0 and `gameTimer.reset()` is called. The game object remains in `gameList`. The next incoming player will iterate `gameList`, find `isFull()` returns false (since `playerCount === 0 < 4`), and join that existing game object — re-using it. This is intentional recycling, not a traditional leak. However:
+
+- The game's `gameId` (and therefore its Socket.IO room) never changes between player sessions
+- A player who reconnects after everyone left will join a room with the same `gameId` as before
+- Under very high load, `gameList` grows unboundedly if enough games are created faster than they can be recycled (e.g. 4-player games that fill up quickly)
+
+**No test covers the recycling path** — the test suite uses fresh server processes per test, so `gameList` never has a recycled game during testing.
 
 ---
 
 ### F-15 — `setInterval` not cleared on process exit · **LOW risk** · Step 4 / future
 
-**File:** [`server/game/timer.js`](../../server/game/timer.js) lines 77–78  
+**File:** [`server/game/timer.js`](../../server/game/timer.js) line 77  
 **File:** [`server/index.js`](../../server/index.js) lines 103–106  
 **Evidence:**
 ```js
-// timer.js line 77 — interval is stored but never given to the outer scope
+// timer.js line 77 — interval stored in closure-local variable; no way to access from outside
 timerInterval = setInterval(tick, resolution);
 
-// server/index.js lines 103–106 — SIGINT handler calls process.exit directly
+// server/index.js lines 103–106 — SIGINT calls process.exit(), not server.close()
 process.on('SIGINT', function() {
     console.log('\nSIGINT signal received. Shutting down gracefully.');
     process.exit();
 });
 ```
-**Why it matters:** `process.exit()` tears down the process regardless of open handles, so in production the leak is invisible. In test teardown, if the server is ever run in-process (after Step 4), the active `setInterval` will keep the Node.js event loop alive after `server.close()` is called, causing tests to hang unless `clearInterval` is called explicitly. The current test harness avoids this by killing the child process (`proc.kill()`).
-
-**What is tested:** The timer expiry test (`game-events.test.js` line 160) sets `initialTimer: 3` and waits for `roundOver`. It verifies that the interval fires and loops. It does not verify clean teardown.
+**`timer.stop()` is exposed** (line 105 of `timer.js`): `this.stop = stopTimer`. But `stopTimer()` is only called via `gameTimer.reset()` (when `playerCount` drops to 0) or `gameTimer.restart()` (on a win). There is no code path that stops all active timers on server shutdown. `process.exit()` discards the event loop so in production this is invisible, but it matters for in-process test teardown after Step 4.
 
 ---
 
@@ -158,49 +172,31 @@ process.on('SIGINT', function() {
 **File:** [`server/index.js`](../../server/index.js) lines 29–40  
 **Evidence — complete block that must be replaced:**
 ```js
-// lines 29–35: app.configure() — does not exist in Express 4
 var app = express();
 app.configure(function () {
-    app.set('port', process.env.PORT || config.port);
-    app.use(express.favicon());       // removed in Express 4 → serve-favicon
-    app.use(express.logger('dev'));   // removed in Express 4 → morgan
+    app.set('port', process.env.PORT || config.port);    // port config
+    app.use(express.favicon());                           // removed in Express 4
+    app.use(express.logger('dev'));                       // removed in Express 4
     app.use(express.static(path.join(__dirname, '..', 'public')));
 });
-
-// lines 37–40: configure('development') — does not exist in Express 4
 app.configure('development', function () {
-    app.use(express.errorHandler());  // removed in Express 4 → errorhandler
+    app.use(express.errorHandler());                      // removed in Express 4
 });
 ```
-**What `app.configure()` did:** In Express 3 it was a thin wrapper: `app.configure(fn)` called `fn()` unconditionally; `app.configure('development', fn)` called `fn()` only when `app.get('env') === 'development'`. The Express 4 equivalent is just inline code with a conditional.
 
-**Exact Express 4 replacement pattern:**
+**Favicon resolution — already in PLAN.md Step 5:** The initial v1 analysis identified `public/favicon.ico` as absent (a gap in the original PLAN.md). PLAN.md Step 5 has since been updated to address this: the resolution is to add a minimal `public/favicon.ico` and let `express.static` serve it, without using `serve-favicon` at all. This means the `serve-favicon` package is **not needed** — `express.static` handles it automatically when the file exists. The v1 analysis proposed `serve-favicon` as one option; PLAN.md selected the cleaner option of just adding the file.
+
+**Confirmed: `public/favicon.ico` does not exist** as of this commit. It must be added in the Step 5 commit.
+
+**`http.test.js` assertion that protects favicon behavior** (line 44):
 ```js
-var app = express();
-app.set('port', process.env.PORT || config.port);
-app.use(require('serve-favicon')(path.join(__dirname, '..', 'public', 'favicon.ico')));
-app.use(require('morgan')('dev'));
-app.use(express.static(path.join(__dirname, '..', 'public')));
-if (app.get('env') === 'development') {
-    app.use(require('errorhandler')());
-}
+['/favicon.ico', null, null]
 ```
-**Additional packages needed:** `serve-favicon`, `morgan`, `errorhandler` — none are currently in `package.json`.
+This asserts status 200 and non-zero body bytes. After Step 5, `express.static` serves the new file. The test passes unchanged.
 
-**Tests that protect this step:**
-- `http.test.js` — all 4 tests: `GET /` HTML content, every static asset including `favicon.ico`, Socket.IO 0.9 client build, 404 for unknown path.
-- The `favicon.ico` test (`http.test.js` line 44) asserts status 200. `serve-favicon` requires the file to exist at the path given. If `public/favicon.ico` does not exist, this test will fail on Express 4. **Action required before Step 5:** verify `public/favicon.ico` exists.
-
-**Favicon file check:**
-```
-public/
-  css/styles.css
-  index.html
-  js/kinetic-v4.6.0.min.js
-  js/SocketController.js
-  js/StageController.js
-```
-`public/favicon.ico` is **not present** in the repository. Express 3's `express.favicon()` served a built-in default when no path was given. `serve-favicon` has no built-in default — it requires an explicit file path. **This is a new gap not called out in ASSESS.md or PLAN.md.** Step 5 must either add a `favicon.ico` to `public/` or update the `http.test.js` assertion for that asset.
+**Tests that protect Step 5:**
+- All 4 `http.test.js` tests
+- Socket.IO layer (Step 6's territory) is not touched
 
 ---
 
@@ -209,80 +205,58 @@ public/
 **File:** [`server/index.js`](../../server/index.js) lines 48–56  
 **Evidence — complete block that must be replaced:**
 ```js
-// line 48 — Socket.IO 0.9 listen API (preserved through Socket.IO 4, no change needed)
-var io = require('socket.io').listen(server);
+var io = require('socket.io').listen(server);    // line 48 — .listen() still works in Socket.IO 4
 
-// lines 50–52 — io.configure() removed in Socket.IO 1.x
-io.configure('development', function () {
+io.configure('development', function () {        // lines 50–52 — REMOVED in Socket.IO 1.x
     io.set('origins', 'http://localhost:' + app.get('port'));
 });
-
-// lines 54–56 — io.configure() + defunct Nodejitsu URL
-io.configure('production', function () {
-    io.set('origins', 'http://get24.jit.su:80');
-});
-```
-**Exact Socket.IO 4 replacement pattern:**
-```js
-var io = require('socket.io')(server, {
-    cors: {
-        origin: process.env.ORIGIN || 'http://localhost:' + app.get('port'),
-        methods: ['GET', 'POST']
-    }
+io.configure('production', function () {         // lines 54–56 — REMOVED in Socket.IO 1.x
+    io.set('origins', 'http://get24.jit.su:80'); // F-21: defunct Nodejitsu PaaS URL
 });
 ```
 
-**`socket.disconnect()` change — line 97:**
+**`socket.disconnect()` at line 97 — behavioral impact if not updated:**
 ```js
-// current (Socket.IO 0.9 — line 97)
+// current
 socket.disconnect();
 
 // required for Socket.IO 4
 socket.disconnect(true);
 ```
-Without `true`, Socket.IO 4's `disconnect()` only closes the namespace connection, not the underlying transport, so the capacity-rejection guard does not actually drop the client.
+Without the `true` argument, Socket.IO 4's `disconnect()` closes only the namespace connection but leaves the underlying transport open. The rejected client in `accept()` would not actually be dropped — it could immediately reconnect. The `overCapacity` behavior (already undeliverable over xhr-polling, as documented in `tests/README.md`) would be even more broken.
 
 ---
 
-#### Test harness impact for Step 6 — detailed
+#### Test harness impact for Step 6 — complete break-point table
 
-This is the highest-risk step. The safety net makes three assumptions about socket.io-client internals that **will break** when upgrading to Socket.IO 4:
+This is the highest-risk step. The safety net makes three assumptions about socket.io-client internals that break when upgrading to Socket.IO 4. All three must be resolved in the **same** Step 6 commit.
 
-**Break 1 — `a.socket.socket.connected` path (socket.test.js line 16, game-events.test.js line 198)**
+| Break | Location | Current code | Required fix | Reason |
+|-------|----------|-------------|--------------|--------|
+| **1** | `socket.test.js` line 16 | `a.socket.socket.connected` | `a.socket.connected` | Socket.IO 4 client exposes `connected` directly on the socket; the 0.9 `.socket.socket` double-hop is gone |
+| **2** | `game-events.test.js` line 198 | `c.socket.socket.connected` | `c.socket.connected` | Same reason |
+| **3** | `harness.js` line 60 | `CLIENT_IO.Transport.websocket = null;` | Replace with `transports: ['polling']` in each `CLIENT.connect()` call in `harness.js` Client constructor | `CLIENT_IO.Transport` does not exist in socket.io-client 4.x; transport restriction must use the connect options API |
+| **4** | `public/js/SocketController.js` line 17 | `socket = io.connect('/');` | `socket = io('/');` | `io.connect` was removed in Socket.IO 4; browser game breaks without this fix |
+| **5** | `harness.js` line 37–43 | `require.cache[xhrShimPath] = { exports: require('./xhr-shim.js') };` | Verify whether socket.io-client 4.x still uses `xmlhttprequest` for polling transport | Socket.IO 4 client uses its own fetch/XHR abstraction; the `xmlhttprequest` shim may no longer be in the dependency tree at all |
 
+**Break 5 — xhr-shim investigation (to be done during Step 6 execution):**
+
+The current `harness.js` (lines 37–43) replaces the `xmlhttprequest` module in `require.cache` before loading the Socket.IO 0.9 client:
 ```js
-// socket.test.js line 16 — current
-assert.strictEqual(a.socket.socket.connected, true, 'client should report itself connected');
-
-// game-events.test.js line 198 — current
-assert.strictEqual(c.socket.socket.connected, false, 'the rejected socket should be disconnected');
+var xhrShimPath = require.resolve('xmlhttprequest');
+require.cache[xhrShimPath] = {
+    id: xhrShimPath, filename: xhrShimPath, loaded: true,
+    exports: require('./xhr-shim.js')
+};
 ```
-In socket.io-client 0.9.x, `socket` is a namespace object wrapping an underlying manager socket. In socket.io-client 4.x the namespace socket IS the socket object — the double `.socket.socket` path does not exist.
+This is necessary because `socket.io-client@0.9.16` depends on `xmlhttprequest@1.4.2` (confirmed in `LEGACY_NPM_LS.txt` line 39), which fails to complete handshakes on Node.js 6 and cannot set the `Origin` header that the legacy server's `io.set('origins', ...)` requires.
 
-**Required fix:** `a.socket.socket.connected` → `a.socket.connected`
+In socket.io-client 4.x, the polling transport is implemented directly (no `xmlhttprequest` package dependency). Steps for the executor:
+1. Check `node_modules/socket.io-client/package.json` after `npm install socket.io@4.x` — if `xmlhttprequest` is not listed as a dependency, `require.resolve('xmlhttprequest')` will throw and the harness will crash.
+2. If `xmlhttprequest` is absent: remove the entire `require.cache` injection block from `harness.js` (lines 37–43) and delete the `require('./xhr-shim.js')` reference.
+3. If `xmlhttprequest` is still present: keep the shim injection but update `xhr-shim.js` to match the new client's expected interface.
 
-**Break 2 — `CLIENT_IO.Transport.websocket = null` (harness.js line 60)**
-
-```js
-// harness.js line 60 — current
-CLIENT_IO.Transport.websocket = null;
-```
-This patch removes the websocket transport from the test process's copy of socket.io-client 0.9.x to force xhr-polling. The socket.io-client 4.x internal API does not have a `Transport` object on `io.js`. The transport restriction will need to use socket.io-client 4.x's connection options:
-```js
-// socket.io-client 4.x equivalent
-CLIENT.connect(url, { transports: ['polling'] });
-```
-
-**Break 3 — `io.connect('/')` in SocketController.js (client-side, no server test)**
-
-```js
-// public/js/SocketController.js line 17
-socket = io.connect('/');
-```
-`io.connect` was deprecated in Socket.IO 3 and removed in Socket.IO 4. The replacement is `io('/')`. This is a client-side file with no server-side test coverage, but it would break the actual browser game after upgrading.
-
-**What is NOT broken by Step 6:**  
-The nine event names (`connected`, `overCapacity`, `gameJoined`, `playerJoined`, `playerQuit`, `evaluatedExpr`, `invalidExpr`, `timer`, `roundOver`) and every payload key are preserved in Socket.IO 4. `socket.emit`, `socket.on`, `socket.broadcast`, `socket.join` all work identically.
+**What is NOT broken by Step 6:** The nine event names (`connected`, `overCapacity`, `gameJoined`, `playerJoined`, `playerQuit`, `evaluatedExpr`, `invalidExpr`, `timer`, `roundOver`) and every payload key. `socket.emit`, `socket.on`, `socket.broadcast`, `socket.join` all work identically in Socket.IO 4.
 
 ---
 
@@ -298,164 +272,379 @@ helpDialog.toggle = function () {
     activeLayer.draw();
 };
 ```
-`layer` is not declared anywhere in the file. The variable holding the active canvas layer is `activeLayer` (declared at line 36). Fix: replace `layer` with `activeLayer` on line 98.
+`layer` is not declared in the file. The canvas layer variable is `activeLayer` (declared line 36). Fix: `layer.add(helpDialog)` → `activeLayer.add(helpDialog)`.
 
-**Test coverage:** None — the 18 safety net tests cover server-side behavior only. This bug is verified by code inspection.
+**Test coverage:** None — 18 tests cover server-side behavior only.
 
 ---
 
 ### F-17 — `blink || true` ignores the `blink` parameter · **LOW risk** · Step 7
 
-**File:** [`public/js/StageController.js`](../../public/js/StageController.js) line 281  
+**File:** [`public/js/StageController.js`](../../public/js/StageController.js) lines 281, 312  
 **Evidence:**
 ```js
-// line 281 — always true, blink argument is never honored
+// line 281 — willBlink is always true regardless of argument
 var willBlink = blink || true;
 
-// line 312 — caller passes false to suppress blink, but it is ignored
+// line 312 — caller passes false to suppress blink on the losing player's expression
 this.showEvaluatedText(data.expression, '#dd0000', false, 5000);
 ```
-`false || true` evaluates to `true`. The losing player's expression is always shown blinking, even though the caller explicitly passes `false`. Fix: `var willBlink = (blink !== false);`
+`false || true` is always `true`. The losing player's expression display always blinks, ignoring the `false` argument. Fix: `blink || true` → `blink !== false`.
 
-**Test coverage:** None — client-side only. Verified by code inspection.
+**Test coverage:** None — client-side only.
 
 ---
 
-### F-20 — KineticJS 4.6.0 abandoned · **MEDIUM risk** · Step 7
+### F-20 — KineticJS 4.6.0 abandoned · **MEDIUM-HIGH risk** · Step 7
 
 **File:** [`public/js/StageController.js`](../../public/js/StageController.js) — throughout  
 **File:** [`public/index.html`](../../public/index.html) line 12  
+
+**All KineticJS API calls and their Konva 9.3.18 status:**
+
+| Line | Current call | Konva.js 9.3.18 equivalent | Change type |
+|------|-------------|---------------------------|-------------|
+| 25 | `new Kinetic.Stage({container, width, height})` | `new Konva.Stage({container, width, height})` | Rename only |
+| 35 | `new Kinetic.Layer()` | `new Konva.Layer()` | Rename only |
+| 36 | `new Kinetic.Layer()` | `new Konva.Layer()` | Rename only |
+| 39 | `new Kinetic.Text({..., shadowOffset: [0,7], ...})` | `shadowOffset: {x:0, y:7}` | **BREAKING — array → object** |
+| 45 | `titleText.setX(...)` | `titleText.x(...)` | Method rename (setter form) |
+| 45 | `titleText.getWidth()` | `titleText.width()` | Method rename (getter form) |
+| 46 | `titleText.setY(...)` | `titleText.y(...)` | Method rename |
+| 46 | `titleText.getHeight()` | `titleText.height()` | Method rename |
+| 47 | `new Kinetic.Text({x, y, ...})` | `new Konva.Text({x, y, ...})` | Rename only |
+| 52 | `descText.setX(...)` | `descText.x(...)` | Method rename |
+| 52 | `descText.getWidth()` | `descText.width()` | Method rename |
+| 61 | `this.children[0].setFill(...)` | `this.children[0].fill(...)` | Method rename |
+| 68 | `this.children[0].setFill(...)` | `this.children[0].fill(...)` | Method rename |
+| 73 | `new Kinetic.Group({x, y, fill})` | `new Konva.Group({x, y, fill})` | Rename only |
+| 77 | `new Kinetic.Rect({...})` | `new Konva.Rect({...})` | Rename only |
+| 81 | `new Kinetic.Text({...})` | `new Konva.Text({...})` | Rename only |
+| 92 | `new Kinetic.Group({x, y})` | `new Konva.Group({x, y})` | Rename only |
+| 103 | `new Kinetic.Rect({...})` | `new Konva.Rect({...})` | Rename only |
+| 104 | `stage.getWidth()` | `stage.width()` | Method rename |
+| 104 | `stage.getHeight()` | `stage.height()` | Method rename |
+| 108 | `new Kinetic.Text({...})` | `new Konva.Text({...})` | Rename only |
+| 113 | `.setText(...)` | `.text(...)` | Method rename |
+| 124 | `new Kinetic.Group({x, y})` | `new Konva.Group({x, y})` | Rename only |
+| 127 | `new Kinetic.Rect({...})` | `new Konva.Rect({...})` | Rename only |
+| 131 | `new Kinetic.Text({...})` | `new Konva.Text({...})` | Rename only |
+| 147 | `new Kinetic.Text({..., shadowOffset: [0,7], ...})` | `shadowOffset: {x:0, y:7}` | **BREAKING — array → object** |
+| 157 | `new Kinetic.Text({..., shadowOffset: [0,7], ...})` | `shadowOffset: {x:0, y:7}` | **BREAKING — array → object** |
+| 163 | `new Kinetic.Animation(fn, layer)` | `new Konva.Animation(fn, layer)` | Rename only |
+| 164 | `mainMsg.setOpacity(...)` | `mainMsg.opacity(...)` | Method rename |
+| 170 | `new Kinetic.Text({...})` | `new Konva.Text({...})` | Rename only |
+| 175 | `new Kinetic.Text({...})` | `new Konva.Text({...})` | Rename only |
+| 182 | `new Kinetic.Text({...})` | `new Konva.Text({...})` | Rename only |
+| 194 | `cardText[i].setVisible(true)` | `cardText[i].visible(true)` | Method rename |
+| 194 | `cardText[i].setText(...)` | `cardText[i].text(...)` | Method rename |
+| 195 | `new Kinetic.Tween({..., easing: Kinetic.Easings.EaseIn, ...})` | `Kinetic.Easings` → `Konva.Easings` | **Namespace rename** |
+| 214 | `new Kinetic.Tween({..., onFinish: fn})` | `new Konva.Tween({..., onFinish: fn})` | Rename only |
+| 226 | `cardText[i].setVisible(false)` | `cardText[i].visible(false)` | Method rename |
+| 227 | `cardText[i].setOpacity(1)` | `cardText[i].opacity(1)` | Method rename |
+| 228 | `cardText[i].setX(-150)` | `cardText[i].x(-150)` | Method rename |
+| 235 | `mainMsg.setText(...)` | `mainMsg.text(...)` | Method rename |
+| 235 | `mainMsg.getWidth()` | `mainMsg.width()` | Method rename |
+| 236 | `mainMsg.setX(...)` | `mainMsg.x(...)` | Method rename |
+| 239 | `new Kinetic.Tween({...})` | `new Konva.Tween({...})` | Rename only |
+| 276 | `evaluatedText.setText(...)` | `evaluatedText.text(...)` | Method rename |
+| 276 | `evaluatedText.setFill(...)` | `evaluatedText.fill(...)` | Method rename |
+| 276 | `evaluatedText.getWidth()` | `evaluatedText.width()` | Method rename |
+| 277 | `evaluatedText.setX(...)` | `evaluatedText.x(...)` | Method rename |
+| 278 | `evaluatedText.setVisible(true)` | `evaluatedText.visible(true)` | Method rename |
+| 283 | `clearInterval(blinkInterval)` | unchanged | Not KineticJS |
+| 284 | `evaluatedText.setVisible(false)` | `evaluatedText.visible(false)` | Method rename |
+| 289 | `evaluatedText.setVisible(!evaluatedText.getVisible())` | `evaluatedText.visible(!evaluatedText.visible())` | Method rename (getter+setter) |
+| 295 | `playersText.setText(...)` | `playersText.text(...)` | Method rename |
+| 300 | `timerText.setText(...)` | `timerText.text(...)` | Method rename |
+
+**Summary of BREAKING changes (3 items require more than a rename):**
+1. Lines 39, 149, 162: `shadowOffset: [0, 7]` → `shadowOffset: { x: 0, y: 7 }` (3 occurrences)
+2. Line 199: `Kinetic.Easings.EaseIn` → `Konva.Easings.EaseIn` (namespace rename, but note Konva uses `'EaseIn'` string form in some contexts — verify against Konva 9.3.18 docs)
+3. Line 63: `this.getLayer()` is called on a `Kinetic.Group` event handler — `getLayer()` exists in Konva 9.3.18 as `.getLayer()` (unchanged, not a method-rename case)
+
+**`http.test.js` assertions that must be updated in Step 7 commit:**
+
+| Location | Current assertion | Updated assertion |
+|----------|------------------|-------------------|
+| `http.test.js` line 24 | `'js/kinetic-v4.6.0.min.js'` in `index.html` body | `'js/konva.min.js'` |
+| `http.test.js` line 41 | `['/js/kinetic-v4.6.0.min.js', /javascript/, ['Kinetic']]` | `['/js/konva.min.js', /javascript/, ['Konva']]` |
+| `http.test.js` line 43 | `['/js/StageController.js', /javascript/, ['Kinetic']]` | `['/js/StageController.js', /javascript/, ['Konva']]` |
+
+---
+
+## 3. New Findings — Not in ASSESS.md or PLAN.md
+
+---
+
+### F-23 — `gameList` recycling is silent and unobservable · **LOW risk** · Note for future phase
+
+**File:** [`server/index.js`](../../server/index.js) lines 61–80  
 **Evidence:**
-```html
-<!-- index.html line 12 -->
-<script type="text/javascript" src="js/kinetic-v4.6.0.min.js"></script>
-```
-KineticJS-specific API calls confirmed present in `StageController.js`:
-
-| Line | API call | Konva.js status |
-|------|----------|-----------------|
-| 25 | `new Kinetic.Stage({...})` | `new Konva.Stage({...})` — same |
-| 35 | `new Kinetic.Layer()` | `new Konva.Layer()` — same |
-| 39 | `new Kinetic.Text({..., shadowOffset: [0,7], ...})` | **BREAKING** — Konva requires `shadowOffset: {x:0, y:7}` |
-| 73 | `new Kinetic.Group({...})` | `new Konva.Group({...})` — same |
-| 163 | `new Kinetic.Animation(fn, layer)` | `new Konva.Animation(fn, layer)` — same |
-| 195 | `new Kinetic.Tween({..., easing: Kinetic.Easings.EaseIn, ...})` | `Kinetic.Easings` → `Konva.Easings` |
-| 214 | `new Kinetic.Tween({..., onFinish: fn})` | same in Konva |
-
-**Breaking API changes requiring code changes in StageController.js:**
-1. `shadowOffset: [0, 7]` (array) → `shadowOffset: { x: 0, y: 7 }` (object) — used on lines 43, 149, 161
-2. `Kinetic.Easings.EaseIn` → `Konva.Easings.EaseIn` — used on line 199
-3. All `Kinetic.*` constructors → `Konva.*` — mechanical find-replace
-
-**Test impact:** `http.test.js` line 42 asserts the string `'Kinetic'` appears in `StageController.js`:
 ```js
-['/js/StageController.js', /javascript/, ['Kinetic']],
-```
-And line 24 asserts `'js/kinetic-v4.6.0.min.js'` appears in `index.html`:
-```js
-'js/kinetic-v4.6.0.min.js',
-```
-Both assertions must be updated when the Konva.js migration is done.
-
----
-
-## 3. Missing Coverage — Gaps in the Safety Net
-
-These behaviors exist in the code but have no test asserting them. They are regression risks for future modernization steps.
-
-| Gap | File / Lines | Why it matters for modernization |
-|-----|-------------|----------------------------------|
-| **Game list never pruned** | `server/index.js` lines 61–80 | `gameList` grows without bound. An empty or finished game is never removed. Under load this leaks memory. No test exercises this. |
-| **Timer does not tick when `initialTimer` is 0** | `server/game/timer.js` line 53 (`config.initialTime \|\| 0`) | If `config.initialTimer` is `0`, `initialTime` is set to `0`, the timer fires immediately on the first tick. Default is 300 so this is not a real scenario, but `\|\| 0` is a gotcha for anyone adding a "no timer" game mode. |
-| **`getRandomCard()` called at Game construction time** | `server/game/index.js` line 22 | `var gameCard = getRandomCard()` runs during `new Game(io)` — before any player joins. The test harness seeds `Math.random` before spawn, so the first call consumes the first RNG value. This is documented in the tests but only as implicit knowledge. Any refactoring that delays card initialization would break the seeded test fixtures. |
-| **`playerCount` can go negative** | `server/game/index.js` line 56 | `if (--playerCount === 0) gameTimer.reset()` — if the disconnect handler fires more times than `connectPlayer` ran (e.g. due to a Socket.IO reconnect race in future versions), `playerCount` goes negative and `isFull()` never returns `true`. No test exercises this. |
-| **Division by zero in card expressions** | `server/game/index.js` line 66 | `parser.evaluate('1/(3-3)+4+7')` — valid characters, passes `validate()`, but throws at eval time. The `try/catch` correctly emits `invalidExpr { msg: 'Invalid.' }`. No test sends a division-by-zero expression. |
-| **`overCapacity` advisory packet is undeliverable** | `server/index.js` lines 96–98 | `socket.emit('overCapacity')` is called then `socket.disconnect()` in the same tick. Over xhr-polling the packet is never sent before the connection drops. This is captured in the tests as expected behavior, but the `SocketController.js` client still shows an `alert()` for it — a UI path that is never exercised. |
-| **No test for concurrent win submissions** | `server/game/index.js` line 130 | If two players submit a winning expression at nearly the same time, both `emitEvaluation` calls run before either `gameCard` reassignment completes. The second player could see the win branch emit `roundOver` with the same card the first player already replaced. This is a known Node.js single-threaded race that no test exercises. |
-
----
-
-## 4. `validate()` Logic — Deeper Analysis
-
-The existing ASSESS.md notes F-18 (type guard) but does not analyse the validation logic itself. This section provides that analysis since `validate()` is called on every player submission.
-
-**File:** [`server/game/index.js`](../../server/game/index.js) lines 89–122
-
-```js
-function validate(expr) {
-    var temp = expr;
-
-    for (var i = 0; i < gameCard.length; i++) {
-        var res = temp.search(gameCard[i]);  // (A)
-        if (res < 0)
-            return -1;
-        else if (res < temp.length - 1 && !isNaN(parseInt(temp[res+1], 10)))
-            return -3;                        // (B)
-        else
-            temp = temp.replace(temp[res],''); // (C)
+if (gameList.length === 0) {
+    gameList.push(new Game(io));
+    gameList[0].join(socket);
+} else {
+    var allGamesFull = true;
+    for (var i = 0; i < gameList.length; i++) {
+        var game = gameList[i];
+        if (!game.isFull()) {
+            game.join(socket);
+            allGamesFull = false;
+            break;
+        }
     }
+    if (allGamesFull) {
+        gameList.push(new Game(io));
+        gameList[gameList.length - 1].join(socket);
+    }
+}
+```
+**Finding:** Games are never removed from `gameList`. When all 4 players disconnect from a game, `playerCount` drops to 0 via the `--playerCount` in the disconnect handler (`game/index.js` line 56). `isFull()` returns `playerCount === config.maxPlayers` = `0 === 4` = `false`. So the empty game is detected as "not full" and the next connecting player joins it — re-using the existing `Game` object, its existing `gameId`, and its existing Socket.IO room.
+
+**Implication for modernization:** The Socket.IO room named by `gameId` persists across multiple player sessions. In Socket.IO 4, room cleanup after all sockets leave is automatic, but a game object in `gameList` can still reference that room name and re-join new sockets to it. This is architecturally the same as before. No behavioral change is expected.
+
+**What is not covered by any test:** The behavior when a game is fully vacated and then a new player arrives. The test suite creates a fresh server process per test (via `spawn`), so `gameList` always starts empty.
+
+---
+
+### F-24 — `timer.js` initializes 7 variables to `undefined` explicitly · **NEGLIGIBLE risk** · Code quality note
+
+**File:** [`server/game/timer.js`](../../server/game/timer.js) lines 40–46  
+**Evidence:**
+```js
+var time = undefined;
+var resolution = undefined;
+var initialTime = undefined;
+var timerInterval = undefined;
+var timerCallback = undefined;
+var intervalCallback = undefined;
+var loop = undefined;
+```
+`var x = undefined` is redundant in JavaScript — unassigned `var` declarations are already `undefined`. This is a code style issue from 2013 Node.js conventions. No behavioral risk. No test impact.
+
+**Modernization opportunity:** If the project ever adopts `strict mode` or a linter, these would be flagged. They are inert but noisy. Can be cleaned up in any future quality pass without any test change.
+
+---
+
+### F-25 — `getRandomCard()` difficulty distribution: `mediumCutoff` value creates 50/30/20 split, not 33/33/33 · **NEGLIGIBLE risk** · Documentation gap
+
+**File:** [`server/game/config.json`](../../server/game/config.json)  
+**File:** [`server/game/index.js`](../../server/game/index.js) lines 143–161  
+**Evidence:**
+```json
+{ "maxPlayers": 4, "initialTimer": 300, "mediumCutoff": 0.5, "easyCutoff": 0.8 }
+```
+```js
+function getRandomCard() {
+    var rnd = Math.random();
+    if (rnd < config.mediumCutoff)       // < 0.5 → 50% medium
+        return cards.med[Math.floor(Math.random() * cards.med.length)];
+    else if (rnd < config.easyCutoff)    // 0.5–0.8 → 30% easy
+        return cards.easy[Math.floor(Math.random() * cards.easy.length)];
+    else                                 // 0.8–1.0 → 20% hard
+        return cards.hard[Math.floor(Math.random() * cards.hard.length)];
+}
+```
+**Finding:** The comment in ASSESS.md (and the general description) says "50% medium, 30% easy, 20% hard." The code confirms this. The naming — `mediumCutoff` and `easyCutoff` — matches the intent. No bug.
+
+**Regression risk for Step 3 (expr-eval):** The test suite seeds `Math.random` via `preload.js` (Lehmer LCG, seed=1). The seeded sequence produces `1347` (medium) then `3455` (easy). These are hardcoded in `game-events.test.js` lines 13–14:
+```js
+var FIRST_CARD = '1347';
+var NEXT_CARD = '3455';
+```
+Any change to `getRandomCard()` or the RNG seed would invalidate these constants. **Step 3 does not change `getRandomCard()` or the RNG** — this is only a note for any future refactoring.
+
+**Additional RNG note:** `getRandomCard()` calls `Math.random()` **twice**: once to determine the difficulty bracket, and once to pick the card within that bracket (lines 144, 148, 153, 158). The seeded LCG in `preload.js` is stateful — both calls consume values from the same sequence. This is correct and expected, but anyone adding a third `Math.random()` call inside `getRandomCard()` would shift the card sequence and break the seeded test fixtures.
+
+---
+
+### F-26 — `cards.json` contains multi-digit repeated-digit cards: `validate()` handles them correctly but the path is non-obvious · **LOW risk** · Code analysis
+
+**File:** [`server/game/cards.json`](../../server/game/cards.json) — easy and hard cards  
+**File:** [`server/game/index.js`](../../server/game/index.js) lines 89–122  
+**Evidence (examples of cards with repeated digits):**
+```
+easy: "1266" (two 6s), "2488" (two 8s), "1148" (two 1s), "1156" (two 5s)
+hard: "2258" (two 2s), "2235" (two 2s)
+```
+
+**How `validate()` handles repeated digits — traced for card `'1148'`:**
+
+```js
+for (var i = 0; i < gameCard.length; i++) {   // iterates: '1', '1', '4', '8'
+    var res = temp.search(gameCard[i]);         // regex search for character
     // ...
+    temp = temp.replace(temp[res], '');         // removes first occurrence of character at res
 }
 ```
 
-**Three concrete code-level observations not in ASSESS.md:**
+For expression `1+1+4+8` with card `'1148'`:
+1. **i=0, `gameCard[0]='1'`:** `temp='1+1+4+8'`. `search('1')` = 0. `temp[0+1]='+'` (not a digit). `replace('1','')` → `temp='+1+4+8'`.
+2. **i=1, `gameCard[1]='1'`:** `temp='+1+4+8'`. `search('1')` = 1. `temp[1+1]='+'` (not a digit). `replace('1','')` → `temp='++4+8'`.
+3. **i=2, `gameCard[2]='4'`:** `temp='++4+8'`. `search('4')` = 2. `temp[2+1]='+'` (not a digit). `replace('4','')` → `temp='+++8'`.
+4. **i=3, `gameCard[3]='8'`:** `temp='+++8'`. `search('8')` = 3. `temp.length - 1 = 3`, so `res < temp.length - 1` is false → combined-digit check skipped. `replace('8','')` → `temp='+++'`.
+5. Second loop: `+` is legal. Returns 0. ✅
 
-**(A) `temp.search(gameCard[i])` treats each digit as a regex pattern.**  
-`String.prototype.search()` accepts a regex. Digits 0–9 have no regex special meaning, so this is safe for the current card format (4-digit strings). If cards ever included regex metacharacters (e.g. `.` or `*`), `search` would match unexpectedly. This is not a regression risk for the current data but is worth noting for any future card format change.
+For expression `11+4+8` with card `'1148'` (attempting to combine two 1s into `11`):
+1. **i=0, `gameCard[0]='1'`:** `search('1')` = 0. `temp[0+1]='1'` — `isNaN(parseInt('1', 10))` = false → returns `-3` ("Digits can't be combined."). ✅
 
-**(B) `temp[res+1]` combined-digit check has an edge case.**  
-`res < temp.length - 1` guards against reading past the end. But if the digit being checked is the very last character of `temp`, `res === temp.length - 1`, so the combined-digit check is **skipped**. Consider `expr = '123+4'` with card `'1234'`: after stripping `1`, `2`, `3`, the remaining temp is `'+4'`. When searching for `4`, `res = 1`, `temp.length - 1 = 1`, so `res < temp.length - 1` is false — the combined check is skipped and the expression passes. This is correct behavior (`4` is the last digit and is isolated), but it demonstrates the guard is subtler than it appears.
-
-**(C) `temp.replace(temp[res], '')` replaces only the first occurrence.**  
-`String.prototype.replace(string, '')` replaces the first occurrence of the literal character. For a card like `'1113'` (three 1s), the loop iterates three times over `'1'`. Each iteration strips one `1`. This correctly enforces "use each digit once" because `replace` is called once per loop iteration. The logic is correct, but it is not obvious — this is a risk for anyone refactoring `validate()` who might reach for `replaceAll`.
-
----
-
-## 5. Prioritised Risk Table for Remaining Steps
-
-| Step | Finding(s) | Risk | Key regression test(s) | New gap identified here |
-|------|-----------|------|------------------------|------------------------|
-| 3 | F-12 (expr-eval) | MEDIUM | `evaluatedExpr===15`, `evaluatedExpr===24`, `invalidExpr 'Invalid.'` | Division-by-zero path untested but protected by try/catch |
-| 4 | F-13 (server decoupling) | LOW-MEDIUM | All 18 — startup ordering must be preserved | `gameList`/`numConnections` globals become visible if server is re-required in same process |
-| 5 | F-02/F-03/F-04/F-05/F-10 (Express 4) | HIGH | All 4 `http.test.js` tests | **`public/favicon.ico` does not exist** — `serve-favicon` requires an explicit file; Express 3's built-in default silently served one |
-| 6 | F-06/F-07/F-08/F-09 (Socket.IO 4) | HIGH | All 14 socket+game-events tests | Harness breaks at 3 points: `socket.socket.connected` path, `Transport.websocket = null` patch, `io.connect` → `io` in SocketController |
-| 7 | F-16/F-17/F-20 (KineticJS→Konva) | MEDIUM-HIGH | `http.test.js` `'Kinetic'` string + filename assertions | `shadowOffset` array→object is a silent breakage; 3 lines in StageController use array form |
+The validate logic correctly handles repeated-digit cards. No bug exists here, but the path is non-obvious and worth documenting for anyone refactoring `validate()`.
 
 ---
 
-## 6. Step 5 Pre-condition: `favicon.ico` Must Be Added
+### F-27 — `run.sh` `set -e` combined with `|| status=1` is correct but subtle · **NEGLIGIBLE risk** · Test infrastructure note
 
-**This is the most actionable new finding in this document.**
+**File:** [`legacy/get24-baseline/tests/run.sh`](../tests/run.sh)  
+**Evidence:**
+```sh
+set -e
+status=0
+for suite in http socket game-events; do
+    node "legacy/get24-baseline/tests/$suite.test.js" || status=1
+done
+exit $status
+```
+**Finding:** `set -e` would normally abort the script on the first non-zero exit code. The `|| status=1` pattern prevents `set -e` from aborting — because the `||` makes the overall expression succeed even when `node ... .test.js` exits 1. All three test suites always run, and `status` accumulates any failure. The final `exit $status` propagates the overall result. This is correct behavior.
 
-`PLAN.md` Step 5 does not mention the favicon problem. `ASSESS.md` F-03 notes the middleware change but does not call out that the file is missing.
-
-- Express 3's `express.favicon()` with no arguments serves a built-in 16×16 ICO from memory. `http.test.js` asserts `GET /favicon.ico` returns status 200.
-- `serve-favicon` (the Express 4 replacement) requires an explicit file path: `serveFavicon(path.join(__dirname, '..', 'public', 'favicon.ico'))`.
-- `public/favicon.ico` does not exist in the repository.
-- If Step 5 is executed without adding a favicon file, `serve-favicon` will throw at startup: `Error: ENOENT: no such file or directory`.
-
-**Resolution options for Step 5 (decision for Nidhi):**
-1. Add a minimal `public/favicon.ico` (can be a 1×1 transparent ICO, 70 bytes) before executing Step 5.
-2. Serve the favicon from a static `public/` route and remove the dedicated middleware (express.static already serves it if the file exists).
-3. Update `http.test.js` to not assert a 200 for `/favicon.ico` — but this weakens the safety net.
-
-Option 1 is recommended: add the file, keep the test as-is.
+**Modernization impact:** When upgrading to a new Node.js runtime (Steps 5, 6), the test suites must run completely — not abort on the first failing suite — so the full failure picture is visible. The current `run.sh` correctly provides this. No change needed.
 
 ---
 
-## 7. Recommended Actions for Nidhi
+### F-28 — `harness.js` `Client` constructor's `'force new connection': true` option is Socket.IO 0.9 specific · **MEDIUM risk** · Step 6
 
-| Priority | Action | Reason |
-|----------|--------|--------|
-| **Before Step 5** | Add `public/favicon.ico` (any valid ICO) | `serve-favicon` will throw at startup without it; `http.test.js` will fail |
-| **Before Step 6** | Update `socket.test.js` line 16: `a.socket.socket.connected` → `a.socket.connected` | Will fail on socket.io-client 4.x |
-| **Before Step 6** | Update `game-events.test.js` line 198: same path fix | Same reason |
-| **Before Step 6** | Update `harness.js` line 60: replace `CLIENT_IO.Transport.websocket = null` with socket.io-client 4.x transport option | Internal API removed in 4.x |
-| **Before Step 6** | Update `public/js/SocketController.js` line 17: `io.connect('/')` → `io('/')` | `io.connect` removed in Socket.IO 4 |
-| **Before Step 7** | Confirm `shadowOffset` format in all Konva.js shapes | 3 usages in `StageController.js` use array form — Konva requires object |
+**File:** [`legacy/get24-baseline/tests/harness.js`](../tests/harness.js) line 174  
+**Evidence:**
+```js
+this.socket = CLIENT.connect('http://127.0.0.1:' + port, {
+    reconnect: false,
+    'force new connection': true    // ← Socket.IO 0.9 specific option name
+});
+```
+**Finding:** `'force new connection': true` is the Socket.IO 0.9 client option that creates a new manager instance instead of reusing an existing one (the 0.9 client caches managers by URL). In socket.io-client 4.x the equivalent is `forceNew: true` (camelCase). The string-key form is not recognized.
+
+**Without this fix:** Multiple calls to `server.client()` in the same test will reuse the same socket manager in Socket.IO 4, causing all clients to share a single underlying connection. Tests that rely on multiple distinct connections (e.g., the second-player join test, the capacity test) would fail non-deterministically or silently.
+
+**Required fix for Step 6:**
+```js
+// current
+this.socket = CLIENT.connect('http://127.0.0.1:' + port, {
+    reconnect: false,
+    'force new connection': true
+});
+
+// Socket.IO 4
+this.socket = CLIENT('http://127.0.0.1:' + port, {
+    reconnect: false,
+    forceNew: true,
+    transports: ['polling']    // transport restriction (replaces CLIENT_IO.Transport.websocket = null)
+});
+```
+
+This change also incorporates the transport restriction (Break 3 from Section 2), consolidating two fixes in one place.
+
+---
+
+## 4. `validate()` Logic — Comprehensive Analysis
+
+**File:** [`server/game/index.js`](../../server/game/index.js) lines 89–122
+
+### 4.1 Already documented
+
+- Line 95: `temp.search(gameCard[i])` treats each digit as a regex — safe for 0–9 but would break for regex metacharacters
+- Line 98–99: combined-digit check skips the guard when the digit is the last character in `temp`
+- Line 101: `replace(temp[res], '')` correctly strips one instance per loop iteration
+
+### 4.2 New analysis: `search()` as regex vs. literal on digit characters
+
+`String.prototype.search()` always interprets its argument as a regular expression. For single-digit characters `'0'`–`'9'`, the regex interpretation is identical to a literal character match — digits have no special regex meaning. This is safe for all cards in `cards.json`.
+
+However: `temp.search(gameCard[i])` where `gameCard[i]` is the character at position `i` of the card string. Cards are 4-character digit strings like `'1347'`. `gameCard[0]` is the string `'1'` (a single character), not the integer `1`. `'1347'[0]` = `'1'`. This is correct — JavaScript string indexing returns a one-character string.
+
+### 4.3 New analysis: edge case when `expr` contains only whitespace
+
+Expression `'   '` (three spaces) with any card:
+1. First loop: `search('1')` on `'   '` returns -1 → returns `-1` ("Must use all 4 digits."). ✅
+
+Expression `''` (empty string) with any card:
+1. First loop: `search('1')` on `''` returns -1 → returns `-1`. ✅
+
+Both are correctly handled by the existing guard. The F-18 type guard (Step 1) already prevents non-strings from reaching this code.
+
+### 4.4 New analysis: whitespace in expression after digit stripping
+
+Expression `'1 + 3 + 4 + 7'` (card `'1347'`):
+1. `search('1')` = 0. `temp[0+1]=' '` — `isNaN(parseInt(' ', 10))` → `parseInt(' ', 10)` = `NaN` → `isNaN(NaN)` = true → combined check passes. Strip `'1'`: `temp=' + 3 + 4 + 7'`.
+2. `search('3')` on `' + 3 + 4 + 7'` = 3. `temp[3+1]=' '` — same, passes. Strip: `temp=' +  + 4 + 7'`.
+3. `search('4')` on `' +  + 4 + 7'` = 5. `temp[5+1]=' '` — passes. Strip: `temp=' +  +  + 7'`.
+4. `search('7')` on `' +  +  + 7'` = 9. Position 9 is the last char — `res < temp.length - 1` = false → combined check skipped. Strip: `temp=' +  +  + '`.
+5. Second loop: `' '`, `'+'` — all legal. Returns 0. ✅
+
+Whitespace-padded expressions pass `validate()` and reach `parser.evaluate()`. This is the intended behavior. For Step 3, `expr-eval@2.x` also handles whitespace in expressions — no behavioral change.
+
+### 4.5 Correctness summary table
+
+| Input | Card | validate() result | Reason |
+|-------|------|-------------------|--------|
+| `'7*4-3-1'` | `1347` | 0 (valid) | All digits found, legal operators |
+| `'1+3+4'` | `1347` | -1 (missing digit) | `7` not found |
+| `'1%3+4+7'` | `1347` | -2 (illegal char) | `%` not in whitelist |
+| `'13+4+7'` | `1347` | -3 (combined digits) | `3` follows `1` |
+| `'1 + 3 + 4 + 7'` | `1347` | 0 (valid) | Spaces are legal |
+| `'1/(3-3)+4+7'` | `1347` | 0 (valid, then eval throws) | Passes validate, caught by try/catch |
+| `'1+1+4+8'` | `1148` | 0 (valid) | Two 1s handled correctly |
+| `'11+4+8'` | `1148` | -3 (combined) | `1` followed by `1` |
+
+---
+
+## 5. Missing Coverage — Gaps in the Safety Net
+
+| Gap | File / Lines | Why it matters for modernization |
+|-----|-------------|----------------------------------|
+| **Game recycling** | `server/index.js` lines 61–80 | Empty games are recycled, not removed. No test exercises a second player session on a recycled game object. |
+| **Whitespace-in-expression evaluation** | `server/game/index.js` line 66 | `'1 + 3 + 4 + 7'` passes `validate()` and reaches `parser.evaluate()`. If `expr-eval` rejects whitespace, Step 3 would introduce a regression with no test catching it. |
+| **Division by zero** | `server/game/index.js` line 66 | `'1/(3-3)+4+7'` passes `validate()`, throws at `evaluate()`, caught by `try/catch` → `invalidExpr`. No test sends this. Protected by the catch, not by a test. |
+| **`playerCount` below zero** | `server/game/index.js` line 56 | Socket.IO reconnect or transport retry could cause a second disconnect event for the same logical player. `--playerCount` would go negative. `isFull()` never returns true. No test exercises this. |
+| **Concurrent win submissions** | `server/game/index.js` lines 129–138 | Two players submitting `= 24` in the same event-loop tick both pass `emitEvaluation`. Both calls see `data.evaluated === 24`, both call `gameTimer.restart()` and reassign `gameCard`. Second caller overwrites first caller's new `gameCard`. Both send `roundOver win` with potentially different `card` values. No test exercises two simultaneous wins. |
+| **`overCapacity` advisory undeliverable** | `server/index.js` lines 96–98 | `socket.emit('overCapacity')` followed immediately by `socket.disconnect()` in the same tick. Over xhr-polling the advisory packet never reaches the client. Documented in `tests/README.md`. The `SocketController.js` `alert()` for `overCapacity` is dead code in practice. |
+| **Timer ticks when `initialTimer` is 0** | `server/game/timer.js` lines 52–56 | `config.initialTime || 0` — if `initialTimer` is set to 0 in config, `initialTime` becomes 0, and the first tick fires immediately with `time = -1`. `if (--time > 0)` is false, so `timerCallback()` fires on tick 1. Not a real scenario with the default config of 300, but a latent edge case. |
+| **`'force new connection'` in harness** | `harness.js` line 175 | Socket.IO 0.9 specific option — silently ignored by socket.io-client 4.x; `forceNew: true` is the 4.x equivalent. Multi-client tests would fail or behave incorrectly without this fix (now documented as F-28). |
+
+---
+
+## 6. Prioritised Risk Table for Remaining Steps
+
+| Step | Finding(s) | Risk | Key regression test(s) | New issues identified in v2 |
+|------|-----------|------|------------------------|----------------------------|
+| 3 | F-12 (`expr-eval`) | MEDIUM | `evaluatedExpr===15`, `evaluatedExpr===24`, `invalidExpr 'Invalid.'` | No test covers whitespace-padded expression evaluation — verify manually |
+| 4 | F-13 (server decoupling) | LOW-MEDIUM | All 18 | Socket.IO must be attached before `listen()` fires |
+| 5 | F-02/F-03/F-04/F-05/F-10 (Express 4) | HIGH | All 4 `http.test.js` tests | `public/favicon.ico` must be added in same commit (now in PLAN.md Step 5) |
+| 6 | F-06/F-07/F-08/F-09 (Socket.IO 4) | HIGH | All 14 socket+game-events tests | **5 harness break-points** (v1 identified 3; v2 adds Break 4 `io.connect` in SocketController and Break 5 xhr-shim investigation) |
+| 6 | F-28 (`'force new connection'`) | MEDIUM | Multi-client tests: second player join, capacity test | **New finding** — `'force new connection': true` must become `forceNew: true` in socket.io-client 4.x; multi-client tests fail without this |
+| 7 | F-16/F-17/F-20 (KineticJS→Konva) | MEDIUM-HIGH | `http.test.js` 3 assertions | Full API mapping table with 50+ call sites confirmed; 3 `shadowOffset` breaking changes + `Kinetic.Easings` namespace rename |
+
+---
+
+## 7. Complete Recommended Actions for Nidhi (v2)
+
+Actions from v1 that are still open, plus new items from this revision:
+
+| Priority | Step | Action | Source |
+|----------|------|--------|--------|
+| **Before Step 5** | 5 | Add `public/favicon.ico` (any valid ICO file) | PLAN.md now documents this — no action needed from this document beyond confirming the file must be added |
+| **Before Step 6** | 6 | Update `socket.test.js` line 16: `a.socket.socket.connected` → `a.socket.connected` | v1 + v2 |
+| **Before Step 6** | 6 | Update `game-events.test.js` line 198: same path fix | v1 + v2 |
+| **Before Step 6** | 6 | Update `harness.js` line 60: remove `CLIENT_IO.Transport.websocket = null` | v1 + v2 |
+| **Before Step 6** | 6 | Update `harness.js` `Client` constructor: `CLIENT.connect(..., {'force new connection': true})` → `CLIENT(..., {forceNew: true, transports: ['polling']})` | **v2 NEW (F-28)** |
+| **Before Step 6** | 6 | Update `harness.js` lines 37–43: investigate and handle xhr-shim for socket.io-client 4.x | v1 + v2 |
+| **Before Step 6** | 6 | Update `public/js/SocketController.js` line 17: `io.connect('/')` → `io('/')` | v1 + v2 |
+| **Before Step 7** | 7 | Replace `shadowOffset: [0, 7]` → `{x:0, y:7}` in `StageController.js` lines 39, 149, 162 | v1 + v2 (v2 adds exact line numbers) |
+| **Optional** | 7 | Verify `Kinetic.Easings.EaseIn` → `Konva.Easings.EaseIn` or string `'EaseIn'` in Konva 9.3.18 | v2 |
+| **After Step 3** | 3 | Manually test whitespace-padded expression (e.g. `'1 + 3 + 4 + 7'`) with `expr-eval@2.x` | **v2 NEW** |
 
 ---
 
 *Analysis produced using IBM Bob IDE — no production code modified.*  
-*Baseline: `arati/risk-analysis` @ `3889bec` (baseline/import-get24 + Steps 1+2)*  
+*v1 baseline: `arati/risk-analysis` @ `97ca37f` · v2: this commit*  
 `ANALYSIS COMPLETE — NO PRODUCTION CODE MODIFIED`

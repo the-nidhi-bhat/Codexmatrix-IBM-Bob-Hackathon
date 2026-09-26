@@ -4,12 +4,12 @@ Chronological record of meaningful IBM Bob contributions to the **Codexmatrix �
 
 ---
 
-## Entry 001 — Legacy Analysis + Risk Review (Arati — arati/risk-analysis branch)
+## Entry 001 — Legacy Analysis + Risk Review v1 (Arati — arati/risk-analysis branch)
 
-**Date:** 2026-09-26  
-**Task:** Code-verified risk analysis supplement for Get24 legacy modernization  
-**Team member:** Arati (Legacy Analysis + Risk role)  
-**Branch:** `arati/risk-analysis` (based on `baseline/import-get24` @ `3889bec`)  
+**Date:** 2026-09-26
+**Task:** Code-verified risk analysis supplement for Get24 legacy modernization
+**Team member:** Arati (Legacy Analysis + Risk role)
+**Branch:** `arati/risk-analysis` (based on `baseline/import-get24` @ `3889bec`)
 **Commit:** `97ca37f`
 
 ### What IBM Bob did
@@ -28,7 +28,7 @@ Chronological record of meaningful IBM Bob contributions to the **Codexmatrix �
 - Read `ASSESS.md` and `PLAN.md` in full to identify genuine gaps
 - Identified **new finding not in ASSESS.md or PLAN.md**: `public/favicon.ico` is absent; `serve-favicon` (needed for Step 5) will throw at startup without it; `http.test.js` favicon 200 assertion will fail
 - Identified 3 specific harness break points for Step 6 with exact lines
-- Produced `legacy/get24-baseline/analysis/ASSESS-ARATI.md`
+- Produced `legacy/get24-baseline/analysis/ASSESS-ARATI.md` (v1)
 
 ### What IBM Bob did NOT do
 
@@ -40,5 +40,45 @@ Chronological record of meaningful IBM Bob contributions to the **Codexmatrix �
 
 ### Status
 
-✅ Completed — `ASSESS-ARATI.md` committed and pushed  
+✅ Completed — `ASSESS-ARATI.md` v1 committed and pushed
 **Branch:** `arati/risk-analysis` → commit `97ca37f`
+
+---
+
+## Entry 002 — Legacy Analysis + Risk Review v2 (Arati — arati/risk-analysis branch)
+
+**Date:** 2026-09-26 (second session)
+**Task:** Improve and validate existing risk analysis — deeper code inspection, new findings, refined Step 6 harness analysis
+**Team member:** Arati (Legacy Analysis + Risk role)
+**Branch:** `arati/risk-analysis`
+**Commit:** (this commit)
+
+### What IBM Bob did
+
+- Re-read all source files and test infrastructure in full to verify v1 claims and find new gaps
+- Confirmed PLAN.md Step 5 was updated to address the favicon gap (v1's key finding) — updated ASSESS-ARATI.md to reflect this
+- **New findings added (F-23 through F-28):**
+  - F-23: `gameList` recycling mechanism — games are re-used, not leaked, but the path is invisible to tests
+  - F-24: `timer.js` `var x = undefined` redundant initialization pattern (7 variables)
+  - F-25: `getRandomCard()` consumes 2 RNG calls per invocation; seeded test fixtures depend on this exact count
+  - F-26: Repeated-digit cards (`'1148'`, `'1266'`, etc.) — `validate()` handles them correctly; traced the algorithm step by step
+  - F-27: `run.sh` `set -e` + `|| status=1` interaction — correct behavior, documented for clarity
+  - F-28: `harness.js` `'force new connection': true` is Socket.IO 0.9 specific — must become `forceNew: true` in socket.io-client 4.x; multi-client tests fail without this fix
+- **Expanded Step 6 harness break-point table** from 3 to 5 break-points with exact required replacements
+- **Full KineticJS → Konva API mapping table** — enumerated all 50+ API call sites in `StageController.js` with exact Konva 9.3.18 equivalents and change types
+- **`validate()` comprehensive analysis** — added whitespace-in-expression trace, edge case table, `search()` regex behavior note
+- **Concurrency race scenario** — added step-by-step trace of the concurrent win submission race
+- Updated IBM_BOB tracking files
+
+### What IBM Bob did NOT do
+
+- Did not modify `ASSESS.md` (Nidhi/OpenCode)
+- Did not modify `PLAN.md` (Nidhi/OpenCode)
+- Did not modify any legacy application source file
+- Did not touch `.opencode/`
+- Did not run the test suite
+
+### Status
+
+✅ Completed — `ASSESS-ARATI.md` v2 committed and pushed
+**Branch:** `arati/risk-analysis`
