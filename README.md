@@ -34,10 +34,10 @@ These phases describe the intended safety process. They are not all implemented 
 
 | Team member | Responsibility |
 |---|---|
-| **Nidhi** | Technical lead; architecture and integration; IBM Bob + OpenCode. |
-| **Arati** | Legacy analysis and risk analysis. SIH responsibilities are also a priority, so hackathon work is intentionally scoped. |
-| **Iffa** | Frontend/UI. SIH responsibilities are also a priority, so hackathon work is intentionally scoped. |
-| **Samrudhi** | Testing, validation, and rollback. |
+| **Nidhi** | Technical lead |
+| **Arati** | Documentation |
+| **Iffa** | Frontend/UI |
+| **Samrudhi** | Testing |
 
 ## IBM Bob
 
