@@ -228,3 +228,57 @@ The Rollback screen is the highlight of the demo — clicking "▶ Start Demo" t
 ### Status
 
 ✅ Completed — 0 TypeScript errors, production build passes, dev server live at http://localhost:5173
+
+<!-- ===== integration merge: both branches recorded an entry here; each side kept verbatim (duplicate numbering is historical, see IBM_BOB/README.md) ===== -->
+
+## Entry 003 — Legacy Analysis + Risk Assessment for Get24 (Arati's task)
+
+**Date:** 2026-09-26  
+**Task:** Structured legacy modernization analysis of the Get24 codebase  
+**Team member:** Arati (Legacy Analysis + Risk role)  
+**Triggered by:** Arati's assigned development task for Legacy Code Whisperer  
+**Branch:** `arati/legacy-analysis`  
+**Commit:** `04176aa`
+
+### What IBM Bob did
+
+- Pulled the latest shared repo state (`git pull origin main`)
+- Discovered `baseline/import-get24` remote branch and fetched it
+- Checked out the Get24 legacy app files read-only (no source modified)
+- Read and analysed every source file:
+  - `package.json` — declared runtime (Node 0.8.x), all 4 dependencies with version ranges
+  - `server/index.js` — Express 3 setup, Socket.IO 0.9 config, connection management
+  - `server/game/index.js` — UUID room creation, expression validation, win/loss/timer events
+  - `server/game/timer.js` — setInterval countdown timer implementation
+  - `server/config.json`, `server/game/config.json` — configuration values
+  - `public/js/SocketController.js`, `public/js/StageController.js` — client-side code
+  - `legacy/get24-baseline/repro/LEGACY_NPM_LS.txt` — resolved dependency tree on Node 6.17.1
+- Read and cross-referenced the existing `ASSESS.md` (22 findings, Nidhi/OpenCode)
+- Read and cross-referenced the existing `PLAN.md` (7-step plan, Nidhi/OpenCode)
+- Read all 3 test files + harness.js + preload.js — understood what each of the 18 tests covers and what invariants they lock
+- Produced **two structured JSON analysis artifacts** grounded entirely in the real Get24 source:
+  - `legacy/get24-baseline/analysis/legacy-analysis.json` — full deep analysis (repository overview, runtime findings, resolved dep tree, socket event contract with all 9 events/payloads, all 22 findings with file+line evidence, 7 modernization candidates, recommended sequence, demo recommendation, safety net summary)
+  - `legacy/get24-baseline/analysis/risk-report.json` — flat UI/backend-consumable risk report (all 22 findings as risk_items with risk_level, blast_radius, regression_risk, safety_net_tests, plan_step references, risk distribution summary)
+- Checked both files for secrets before committing (none found)
+- Staged only the two new analysis files (not the legacy app source)
+- Committed and pushed to `arati/legacy-analysis`
+
+### Key findings produced
+
+- 22 total findings: 5 HIGH, 5 MEDIUM, 10 LOW, 2 NEGLIGIBLE
+- **5 HIGH risk items**: Node runtime (F-01), Express 3 `app.configure()` boot failure (F-02), Socket.IO `io.configure()` boot failure (F-06), defunct Nodejitsu CORS origin (F-07), socket.io@0.9.x EOL (F-09), express@3.0.x EOL (F-10) — counted as 5 unique risks across F-01/F-09/F-10 (EOL runtime+deps) and F-02/F-06 (hard boot failures)
+- **Recommended demo step**: Socket.IO 0.9 → 4 (Step 6) — shows Verify → Rollback cycle with 14 behavioral test assertions
+- **Safety net**: 18 tests, what each covers, and how to run them documented in the artifact
+
+### What IBM Bob did NOT do
+
+- Did not modify any legacy application source code
+- Did not modify Nidhi's ASSESS.md or PLAN.md
+- Did not touch `.opencode/`
+- Did not run the test suite (Node 6.17.1 Docker environment not available on this machine)
+- Did not commit the legacy app files (those belong to Nidhi's `baseline/import-get24` branch)
+
+### Status
+
+✅ Completed — two JSON artifacts committed and pushed  
+**Branch:** `arati/legacy-analysis` → commit `04176aa`

@@ -8,16 +8,18 @@ Read this before reading the logs. Two of the four session summaries in `bob_ses
 
 | File | What it logs | Authored by |
 |---|---|---|
-| `BOB_USAGE.md` | Chronological entries: what was done, what was deliberately not done, status | two independent sources, see below |
-| `BOB_CHANGES.md` | Per-change record: files created, files read, commands, verification | two independent sources |
-| `BOB_PROMPTS.md` | The prompts that were issued and what came of them | two independent sources |
+| `BOB_USAGE.md` | Chronological entries: what was done, what was deliberately not done, status | independent sources, see below |
+| `BOB_CHANGES.md` | Per-change record: files created, files read, commands, verification | independent sources |
+| `BOB_PROMPTS.md` | The prompts that were issued and what came of them | independent sources |
 
-Each file contains **two complete logs that were written independently** and then met during integration:
+Each file contains **two or three complete logs that were written independently** and then met during integration:
 
 - **First half — Arati A Patil, `arati/risk-analysis`** (commits `97ca37f` … `d3a5651`). Three sessions: risk review v1, risk review v2, and the modernization execution specification. The matching session summary `bob_sessions/2026-09-26-execution-plan.md` states the tool as *IBM Bob IDE (Agent mode)*, so these entries are attested by their author as Bob work.
 - **Second half — Nidhi Bhat, project scaffold line** (commits `c5cc6da`, `581058c`, `67edb3f`). Initial project inspection, the "Codexmatrix is the team name" correction, and the first dashboard build. These entries are written in the third person as *what IBM Bob did*; the work was performed in this repository with **OpenCode**, Nidhi's coding agent, not with IBM Bob.
 
-The two halves are joined by a single HTML comment divider in each file. No entry was renumbered, reworded, reordered or removed, so both versions can be read as written. This index is the only correction.
+The halves are joined by HTML comment dividers in each file. No entry was renumbered, reworded, reordered or removed, so every version can be read as written. This index is the only correction.
+
+A third independent record was merged after the first integration: **Arati A Patil, `arati/legacy-analysis`** (commits `04176aa`, `d0b1fe1`), the machine-readable artifacts `legacy/get24-baseline/analysis/legacy-analysis.json` and `risk-report.json` plus the log entries for them. That branch was started before `arati/risk-analysis`, so its entries collide with the risk-analysis entries on entry numbers — `Change 002` exists in two versions, one dated 2025-09-26 (scaffold line) and one dated 2026-09-26 (`arati/legacy-analysis`). Both are kept as written rather than renumbered, so read the **date, team member and branch** lines to tell them apart.
 
 ## Session summaries in `bob_sessions/`
 

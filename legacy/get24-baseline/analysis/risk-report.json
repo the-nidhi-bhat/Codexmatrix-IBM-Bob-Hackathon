@@ -1,0 +1,297 @@
+{
+  "_meta": {
+    "project": "Legacy Code Whisperer",
+    "team": "Codexmatrix",
+    "subject": "Get24 v0.0.9",
+    "baseline_tag": "legacy-baseline",
+    "baseline_commit": "96c17e1",
+    "analysis_author": "Arati (IBM Bob IDE)",
+    "companion_document": "legacy/get24-baseline/analysis/legacy-analysis.json",
+    "purpose": "Flat, UI/backend-consumable risk report. Each row is one finding. Risk levels: HIGH / MEDIUM / LOW / NEGLIGIBLE."
+  },
+
+  "runtime_summary": {
+    "declared_node": "0.8.x",
+    "functional_node": "6.17.1",
+    "target_node": "20 LTS",
+    "boots_on_node_20": false,
+    "reason_cannot_boot": "Express 3 app.configure() + Socket.IO 0.9 io.configure()/io.set() both removed in their respective v4 / v1 upgrades",
+    "safety_net_tests": 18,
+    "safety_net_passing": 18
+  },
+
+  "risk_items": [
+    {
+      "id": "F-01",
+      "risk_level": "HIGH",
+      "category": "runtime",
+      "title": "Node.js engine declared as 0.8.x; functional only on 6.17.1",
+      "file": "package.json:20",
+      "modernization_opportunity": "Target Node 20 LTS via Express 4 + Socket.IO 4 upgrades",
+      "blast_radius": "entire server",
+      "regression_risk": "Every async behavior, timer precision, and Buffer API assumption may differ across 12 years of Node.js evolution",
+      "plan_step": null,
+      "safety_net_tests": "all 18"
+    },
+    {
+      "id": "F-02",
+      "risk_level": "HIGH",
+      "category": "deprecated_api",
+      "title": "app.configure() removed in Express 4 — server will not boot",
+      "file": "server/index.js:30-40",
+      "modernization_opportunity": "Remove configure() wrappers; inline middleware directly. Add serve-favicon, morgan, errorhandler packages.",
+      "blast_radius": "server/index.js entire middleware registration block",
+      "regression_risk": "Middleware ordering must be exactly preserved. boot-level failure means all 18 tests fail if order is wrong.",
+      "plan_step": 5,
+      "safety_net_tests": "http.test.js (all 4)"
+    },
+    {
+      "id": "F-06",
+      "risk_level": "HIGH",
+      "category": "deprecated_api",
+      "title": "io.configure() / io.set() removed in Socket.IO 1.x — server will not boot on Socket.IO 4",
+      "file": "server/index.js:50-56",
+      "modernization_opportunity": "Replace with cors option on Socket.IO constructor",
+      "blast_radius": "server/index.js Socket.IO config block; test harness uses socket.io-client internals that change in v3+",
+      "regression_risk": "Highest-risk single change. Test harness (harness.js, socket.test.js, game-events.test.js) must be updated in the same step. socket.socket.connected path changes in Socket.IO 3+.",
+      "plan_step": 6,
+      "safety_net_tests": "socket.test.js (4), game-events.test.js (10)"
+    },
+    {
+      "id": "F-07",
+      "risk_level": "HIGH",
+      "category": "configuration",
+      "title": "Production CORS origin hardcoded to defunct Nodejitsu PaaS (http://get24.jit.su:80)",
+      "file": "server/index.js:55",
+      "modernization_opportunity": "Replace with ORIGIN environment variable passed to Socket.IO cors option",
+      "blast_radius": "server/index.js line 55 — production deploy only; tests bypass via xhr-shim",
+      "regression_risk": "Low for existing tests (bypassed by harness); high for any real deployment",
+      "plan_step": 6,
+      "safety_net_tests": "socket.test.js (harness bypasses via xhr-shim)"
+    },
+    {
+      "id": "F-09",
+      "risk_level": "HIGH",
+      "category": "eol_dependency",
+      "title": "socket.io@0.9.x end-of-life",
+      "file": "package.json:11",
+      "modernization_opportunity": "Upgrade to socket.io@4.x; update socket.io-client in test harness to match",
+      "blast_radius": "server/index.js config block; SocketController.js client-side io.connect('/') API deprecated",
+      "regression_risk": "io.connect is deprecated in favor of io(). Client harness Transport.websocket trick may not apply to 4.x client internals.",
+      "plan_step": 6,
+      "safety_net_tests": "socket.test.js (4), game-events.test.js (10)"
+    },
+    {
+      "id": "F-10",
+      "risk_level": "HIGH",
+      "category": "eol_dependency",
+      "title": "express@3.0.x end-of-life",
+      "file": "package.json:12",
+      "modernization_opportunity": "Upgrade to express@4.x",
+      "blast_radius": "server/index.js entire setup block",
+      "regression_risk": "app.configure() is the only breaking surface; static file serving and routing APIs are preserved. Mechanical but total change to middleware registration.",
+      "plan_step": 5,
+      "safety_net_tests": "http.test.js (all 4)"
+    },
+    {
+      "id": "F-12",
+      "risk_level": "MEDIUM",
+      "category": "unmaintained_dependency",
+      "title": "node-expression-eval@0.1.x unmaintained since 2013",
+      "file": "server/game/index.js:12,65",
+      "modernization_opportunity": "Replace with expr-eval@2.x (maintained continuation of same codebase)",
+      "blast_radius": "server/game/index.js lines 12 and 65 — core game mechanic",
+      "regression_risk": "Any difference in operator precedence, whitespace handling, or error type would change evaluated values and break the 4 game-events expression tests",
+      "plan_step": 3,
+      "safety_net_tests": "game-events.test.js: evaluatedExpr===15, evaluatedExpr===24, invalidExpr 'Invalid.'"
+    },
+    {
+      "id": "F-13",
+      "risk_level": "MEDIUM",
+      "category": "architecture",
+      "title": "Server start is a module side-effect — requires child process spawn for tests",
+      "file": "server/index.js:43-48, index.js:1",
+      "modernization_opportunity": "Export a start() function; call it from index.js. Expose server and io for programmatic shutdown.",
+      "blast_radius": "server/index.js startup block; index.js entry",
+      "regression_risk": "Startup ordering must be preserved exactly (middleware before listen, Socket.IO after server). No observable HTTP/socket behavior changes.",
+      "plan_step": 4,
+      "safety_net_tests": "all 18"
+    },
+    {
+      "id": "F-14",
+      "risk_level": "MEDIUM",
+      "category": "architecture",
+      "title": "Global mutable gameList and numConnections — no inter-test isolation without process boundary",
+      "file": "server/index.js:25-26",
+      "modernization_opportunity": "Encapsulate in a GameManager class or closure passed to start()",
+      "blast_radius": "server/index.js connection handler",
+      "regression_risk": "Tests currently isolated by spawning a fresh process per test. Risk only materializes if in-process testing is adopted.",
+      "plan_step": null,
+      "safety_net_tests": "all 18 (currently isolated)"
+    },
+    {
+      "id": "F-20",
+      "risk_level": "MEDIUM",
+      "category": "eol_dependency",
+      "title": "KineticJS 4.6.0 abandoned — superseded by Konva.js",
+      "file": "public/js/kinetic-v4.6.0.min.js",
+      "modernization_opportunity": "Replace with Konva.js; fix F-16 (layer→activeLayer) and F-17 (blink||true) in the same pass",
+      "blast_radius": "public/js/StageController.js (entire file); http.test.js filename and 'Kinetic' string assertions must be updated",
+      "regression_risk": "shadowOffset array→object syntax; some Tween/Animation property names differ. No server-side risk. No visual regression test coverage.",
+      "plan_step": 7,
+      "safety_net_tests": "http.test.js (filename and Kinetic string assertions need update)"
+    },
+    {
+      "id": "F-03",
+      "risk_level": "MEDIUM",
+      "category": "deprecated_api",
+      "title": "express.favicon() removed in Express 4",
+      "file": "server/index.js:32",
+      "modernization_opportunity": "Replace with serve-favicon package",
+      "blast_radius": "server/index.js line 32",
+      "regression_risk": "favicon.ico test in http.test.js must still return 200",
+      "plan_step": 5,
+      "safety_net_tests": "http.test.js (GET /favicon.ico)"
+    },
+    {
+      "id": "F-11",
+      "risk_level": "LOW",
+      "category": "deprecated_dependency",
+      "title": "node-uuid@1.4.x deprecated",
+      "file": "server/game/index.js:13,21",
+      "modernization_opportunity": "Replace with uuid@9.0.1 (two-line change; output format identical)",
+      "blast_radius": "server/game/index.js lines 13 and 21 only",
+      "regression_risk": "UUID v4 format unchanged; socket.test.js UUID_V4 regex must still pass",
+      "plan_step": 2,
+      "safety_net_tests": "socket.test.js UUID_V4 regex on gameJoined.room"
+    },
+    {
+      "id": "F-18",
+      "risk_level": "LOW",
+      "category": "defensive_coding",
+      "title": "validate() called without type guard — TypeError on non-string socket input",
+      "file": "server/game/index.js:60-61",
+      "modernization_opportunity": "Add typeof data.expression !== 'string' guard before validate() call",
+      "blast_radius": "1 line in submitExpression handler",
+      "regression_risk": "Negligible — guard adds silent return for inputs no existing test sends",
+      "plan_step": 1,
+      "safety_net_tests": "game-events.test.js — all invalidExpr paths"
+    },
+    {
+      "id": "F-15",
+      "risk_level": "LOW",
+      "category": "resource_leak",
+      "title": "setInterval not cleared on server stop — event loop stays alive",
+      "file": "server/game/timer.js:77-79",
+      "modernization_opportunity": "clearInterval on SIGINT / server close event",
+      "blast_radius": "clean shutdown only",
+      "regression_risk": "No functional impact on behavior; affects test teardown speed",
+      "plan_step": null,
+      "safety_net_tests": "none directly"
+    },
+    {
+      "id": "F-08",
+      "risk_level": "LOW",
+      "category": "deprecated_api",
+      "title": "socket.disconnect() should be socket.disconnect(true) in Socket.IO 4",
+      "file": "server/index.js:97",
+      "modernization_opportunity": "Change to socket.disconnect(true) when upgrading to Socket.IO 4",
+      "blast_radius": "capacity rejection path only",
+      "regression_risk": "game-events.test.js capacity test must still show rejected socket disconnected",
+      "plan_step": 6,
+      "safety_net_tests": "game-events.test.js capacity test"
+    },
+    {
+      "id": "F-16",
+      "risk_level": "LOW",
+      "category": "existing_bug",
+      "title": "helpDialog.toggle() ReferenceError: layer is not defined",
+      "file": "public/js/StageController.js:98",
+      "modernization_opportunity": "Replace layer with activeLayer (fix alongside KineticJS→Konva upgrade)",
+      "blast_radius": "client UI only — clicking Help button crashes in browser",
+      "regression_risk": "No server test coverage; UI-only fix",
+      "plan_step": 7,
+      "safety_net_tests": "none"
+    },
+    {
+      "id": "F-17",
+      "risk_level": "LOW",
+      "category": "existing_bug",
+      "title": "blink || true always forces blink regardless of argument",
+      "file": "public/js/StageController.js:281",
+      "modernization_opportunity": "Change to blink !== false (fix alongside KineticJS→Konva upgrade)",
+      "blast_radius": "client UI only — showEvaluatedText blink parameter silently ignored",
+      "regression_risk": "No server test coverage; UI-only fix",
+      "plan_step": 7,
+      "safety_net_tests": "none"
+    },
+    {
+      "id": "F-04",
+      "risk_level": "LOW",
+      "category": "deprecated_api",
+      "title": "express.logger() removed in Express 4",
+      "file": "server/index.js:33",
+      "modernization_opportunity": "Replace with morgan('dev') package",
+      "blast_radius": "server/index.js line 33",
+      "regression_risk": "No behavioral test asserts log output",
+      "plan_step": 5,
+      "safety_net_tests": "none directly"
+    },
+    {
+      "id": "F-05",
+      "risk_level": "LOW",
+      "category": "deprecated_api",
+      "title": "express.errorHandler() removed in Express 4",
+      "file": "server/index.js:39",
+      "modernization_opportunity": "Replace with errorhandler package",
+      "blast_radius": "server/index.js line 39",
+      "regression_risk": "No behavioral test exercises error response pages",
+      "plan_step": 5,
+      "safety_net_tests": "none directly"
+    },
+    {
+      "id": "F-21",
+      "risk_level": "LOW",
+      "category": "configuration",
+      "title": "Hard-coded defunct Nodejitsu production origin",
+      "file": "server/index.js:55",
+      "modernization_opportunity": "Replace with ORIGIN environment variable (absorbed into Socket.IO 4 upgrade)",
+      "blast_radius": "production deploy only",
+      "regression_risk": "No test exercises the production configure block",
+      "plan_step": 6,
+      "safety_net_tests": "none directly"
+    },
+    {
+      "id": "F-22",
+      "risk_level": "LOW",
+      "category": "dependency_pinning",
+      "title": "No package-lock.json — floating version ranges",
+      "file": "package.json",
+      "modernization_opportunity": "Mitigated by npm-shrinkwrap.json in legacy/get24-baseline/repro/",
+      "blast_radius": "reproducibility only",
+      "regression_risk": "Negligible — baseline pinned via shrinkwrap",
+      "plan_step": null,
+      "safety_net_tests": "none directly"
+    },
+    {
+      "id": "F-19",
+      "risk_level": "NEGLIGIBLE",
+      "category": "documentation",
+      "title": "README and server/config.json disagree on default port (3001 vs 4000)",
+      "file": "README.md:73, server/config.json:3",
+      "modernization_opportunity": "Align README to config; note PORT env var wins",
+      "blast_radius": "documentation only",
+      "regression_risk": "None",
+      "plan_step": null,
+      "safety_net_tests": "none"
+    }
+  ],
+
+  "risk_distribution": {
+    "HIGH": 5,
+    "MEDIUM": 5,
+    "LOW": 10,
+    "NEGLIGIBLE": 2,
+    "total": 22
+  }
+}
