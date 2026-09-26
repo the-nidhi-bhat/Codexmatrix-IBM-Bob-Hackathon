@@ -9,7 +9,7 @@
   "dependencies": {
     "socket.io": "0.9.x",
     "express": "3.0.x",
-    "uuid": "9.0.1",
+    "node-uuid": "1.4.x",
     "node-expression-eval": "0.1.x"
   },
   "subdomain": "Get24",
