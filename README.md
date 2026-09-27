@@ -4,7 +4,7 @@
 
 Built for the **IBM Bob 2.0 Hackathon** by Team Codexmatrix.
 
-Legacy repositories can be difficult and risky to understand, change, verify, and recover safely. Legacy Code Whisperer combines repository analysis, a bounded modernization workflow, and a checkpoint/recovery engine so changes can be inspected and tested before they are accepted.
+Developers maintaining inherited or long-lived repositories can face unfamiliar dependencies, undocumented behavior, and risk when changing code. Legacy Code Whisperer combines repository analysis, a bounded modernization workflow, and a checkpoint/recovery engine so changes can be inspected and tested before they are accepted.
 
 ## Workflow
 
@@ -44,6 +44,8 @@ flowchart LR
 
 The API binds to loopback. Run state is held in memory for the life of the backend process. The legacy verification path uses Docker to run the target application in its reference runtime.
 
+The frontend calls `POST /api/analyze` and `GET /api/runs/:runId` for repository analysis; `GET /api/modernization/operations` and `POST /api/modernization/execute` for modernization; and `POST /api/checkpoint-runs`, `POST /api/checkpoint-runs/:id/verify`, and `GET /api/checkpoint-runs/:id` for checkpoint lifecycle operations. The backend uses Git and Docker; no model API is called at runtime.
+
 ## Technology
 
 - **Interface:** React, TypeScript, Vite, Mermaid, and oxlint.
@@ -74,6 +76,19 @@ Repository analysis needs access to the public GitHub repository entered in the 
 ## Verification
 
 The repository includes backend tests for API trust boundaries, checkpoint flow, executor lifecycle and safety, integration wiring, reference validation, static security checks, and validation tooling. It also includes a frontend checkpoint contract test, checkpoint refusal tests, and the legacy behavioral test suite.
+
+Latest recorded local verification for source commit `5d3a193`:
+
+| Check | Result |
+|---|---|
+| Backend tests | 234 passed, 0 failed |
+| Frontend contract tests | 16 passed, 0 failed |
+| Checkpoint refusal tests | 6 passed, 0 failed |
+| Legacy Docker safety net | 18 passed, 0 failed |
+| Frontend typecheck and production build | Passed; build reported a large-chunk warning |
+| Lint | Passed with two warnings |
+
+The backend test suite includes the tracked-credential check. The README-only commits after `5d3a193` did not change application code.
 
 Run the existing checks from the repository root:
 
