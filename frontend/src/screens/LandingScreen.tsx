@@ -1,10 +1,16 @@
+import { useRef, type CSSProperties } from "react";
 import { DiffTexture } from "../Texture";
-import "../landing.css";
+import { useReveal } from "../useReveal";
+import ThemeToggle from "../ThemeToggle";
+import "../App.css";
 
 interface LandingScreenProps {
   /** Opens the existing repository-input screen. */
   onAnalyze: () => void;
 }
+
+/** Stagger helper for the scroll-reveal transition. */
+const delay = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
 
 const NAV_LINKS = [
   { href: "#product", label: "Product" },
@@ -95,8 +101,11 @@ const FACTS = [
 ];
 
 export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  useReveal(rootRef);
+
   return (
-    <div className="land">
+    <div className="land" ref={rootRef}>
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="land-top">
         <div className="brand">
@@ -113,6 +122,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
         <div className="land-top-right">
           <span className="eyebrow">IBM Bob 2.0 · Team Codexmatrix</span>
           <span className="demo-chip">demo</span>
+          <ThemeToggle />
           <button className="btn btn-solid" onClick={onAnalyze}>
             Analyze a repository
           </button>
@@ -139,7 +149,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
 
             <div className="land-cta">
               <button className="btn btn-solid btn-lg" onClick={onAnalyze}>
-                Analyze a repository →
+                Analyze a repository <span className="btn-arrow" aria-hidden="true">→</span>
               </button>
               <a className="land-link" href="#how-it-works">See how it works →</a>
             </div>
@@ -156,7 +166,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
       {/* ── What it does ───────────────────────────────────── */}
       <section className="land-band" id="product">
         <div className="land-section">
-          <div className="land-head">
+          <div className="land-head" data-reveal>
             <span className="land-index">01</span>
             <div>
               <h2 className="land-h2">What it does</h2>
@@ -168,8 +178,13 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
           </div>
 
           <div className="land-grid">
-            {CAPABILITIES.map((c) => (
-              <article key={c.n} className="card land-card">
+            {CAPABILITIES.map((c, i) => (
+              <article
+                key={c.n}
+                className="card land-card"
+                data-reveal
+                style={delay(i * 70)}
+              >
                 <div className="land-card-n">{c.n}</div>
                 <h3 className="land-card-t">{c.title}</h3>
                 <p className="land-card-d">{c.detail}</p>
@@ -182,7 +197,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
       {/* ── How it works ───────────────────────────────────── */}
       <section className="land-band" id="how-it-works">
         <div className="land-section">
-          <div className="land-head">
+          <div className="land-head" data-reveal>
             <span className="land-index">02</span>
             <div>
               <h2 className="land-h2">How it works</h2>
@@ -193,8 +208,8 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
           </div>
 
           <div className="land-flow">
-            {STAGES.map((s) => (
-              <div key={s.n} className="land-stage">
+            {STAGES.map((s, i) => (
+              <div key={s.n} className="land-stage" data-reveal style={delay(i * 80)}>
                 <div className="land-stage-n">{s.n}</div>
                 <div className="land-stage-t">{s.title}</div>
                 <p className="land-stage-d">{s.detail}</p>
@@ -207,7 +222,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
       {/* ── Safety ─────────────────────────────────────────── */}
       <section className="land-band" id="safety">
         <div className="land-section">
-          <div className="land-head">
+          <div className="land-head" data-reveal>
             <span className="land-index">03</span>
             <div>
               <h2 className="land-h2">Safety first, by construction</h2>
@@ -219,7 +234,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
           </div>
 
           <div className="land-safety">
-            <div className="land-safety-lead">
+            <div className="land-safety-lead" data-reveal>
               <p className="lede">
                 Legacy modernization usually fails because changes are applied faster than
                 they can be verified. Legacy Code Whisperer inverts that: every step is
@@ -237,8 +252,8 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
             </div>
 
             <ul className="land-checks">
-              {SAFETY_POINTS.map((p) => (
-                <li key={p.title} className="card land-check">
+              {SAFETY_POINTS.map((p, i) => (
+                <li key={p.title} className="card land-check" data-reveal style={delay(i * 70)}>
                   <span className="land-check-i" aria-hidden="true">✓</span>
                   <div>
                     <div className="land-check-t">{p.title}</div>
@@ -253,7 +268,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
 
       {/* ── Final CTA ──────────────────────────────────────── */}
       <section className="land-final">
-        <div className="land-final-inner">
+        <div className="land-final-inner" data-reveal>
           <div>
             <h2 className="land-h2">See it on your own repository</h2>
             <p className="land-sub" style={{ marginTop: 10 }}>
@@ -262,7 +277,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
             </p>
           </div>
           <button className="btn btn-solid btn-lg" onClick={onAnalyze}>
-            Analyze your repository →
+            Analyze your repository <span className="btn-arrow" aria-hidden="true">→</span>
           </button>
         </div>
       </section>

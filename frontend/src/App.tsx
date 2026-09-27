@@ -13,6 +13,7 @@ import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
 import { useModernization } from "./workflow/useModernization";
 import type { WorkflowState } from "./workflow/types";
 import { analyzeRepository, WorkflowApiError } from "./api/workflowApi";
+import ThemeToggle from "./ThemeToggle";
 import "./App.css";
 
 type Screen = "architecture" | "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
@@ -140,20 +141,23 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
             </span>
           </div>
           {/* Change repo */}
-          <button
-            onClick={onChangeRepo}
-            style={{
-              padding: "4px 10px",
-              background: "transparent",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--muted)",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
-          >
-            ← Change repo
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ThemeToggle />
+            <button
+              onClick={onChangeRepo}
+              style={{
+                padding: "4px 10px",
+                background: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: 4,
+                color: "var(--muted)",
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+            >
+              ← Change repo
+            </button>
+          </div>
         </div>
       </header>
 
