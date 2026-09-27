@@ -35,6 +35,29 @@
 //    hard-coded paths under ROOT.
 //  - The worktree is removed in a finally block; a removal failure is
 //    reported as a cleanup warning instead of being hidden.
+//
+//  Ancestry is checked against a NAMED, server-owned ref, never against the
+//  ambient HEAD. That distinction is the whole point of this file's contract:
+//
+//    default  anchor = integration/final, checkout detached at the commit.
+//             Correct for a baseline subject: a commit in the controlled
+//             integration history. Anchor is a name, so the answer does not
+//             change because someone checked out a different branch.
+//
+//    run ref  anchor = lcw/modernization/<uuid>, checkout ATTACHED to it.
+//             Correct for a modernization subject: the executor's commit is a
+//             CHILD of integration/final, so it is genuinely not an ancestor
+//             of the integration tip, and anchoring on the tip refused a
+//             perfectly legitimate run. Anchoring on the branch that holds it
+//             is both true and narrower — the commit must be inside that
+//             specific run branch. Attaching, rather than detaching, is what
+//             lets the engine's own `git revert` land as a persistent commit
+//             on a server-owned branch instead of a throwaway detached HEAD.
+//
+//  This replaces an ancestry check against HEAD; it does not relax one. The
+//  commit must still be a full 40-character SHA, must exist, and must be
+//  contained in the anchor. A ref is accepted only if it matches the executor's
+//  run-branch pattern, so no caller can widen the set of trusted refs.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { execFile, spawn } from "child_process";
@@ -43,6 +66,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { v4 as uuidv4 } from "uuid";
+import { INTEGRATION_BRANCH, RUN_BRANCH } from "./modernization/executor";
 
 const execFileAsync = promisify(execFile);
 
@@ -68,6 +92,8 @@ export type CheckpointOutcome = "COMPLETED" | "REJECTED" | "FAILED";
 export interface CheckpointRunError {
   code:
     | "INVALID_COMMIT_SHA"
+    | "UNTRUSTED_REF"
+    | "REF_NOT_FOUND"
     | "REPO_ROOT_UNRESOLVED"
     | "COMMIT_NOT_FOUND"
     | "COMMIT_NOT_ANCESTOR"
@@ -87,6 +113,9 @@ export interface CheckpointRunResult {
   error?: CheckpointRunError;
   /** The commit that was verified, echoed back for the audit trail. */
   commit: string;
+  /** The named, server-owned ref the commit was required to be contained in:
+   *  integration/final, or the run branch the executor created. Never "HEAD". */
+  anchorRef: string;
   repositoryRoot: string;
   worktreePath: string;
   resultFile: string;
@@ -110,6 +139,16 @@ export interface CheckpointRunResult {
 export interface RunCheckpointOptions {
   /** Server-controlled, full 40-character commit SHA. */
   commit: string;
+  /**
+   * Optional server-owned anchor. Omit it for a baseline subject that lives in
+   * the controlled integration history. Pass the executor's
+   * lcw/modernization/<uuid> branch for a modernization subject — that commit
+   * is a child of the integration tip, so it is not an ancestor of it.
+   *
+   * Server-controlled, never client text: a value that does not match the
+   * executor's run-branch pattern is refused before any git command runs.
+   */
+  ref?: string;
   timeoutMs?: number;
 }
 
@@ -196,6 +235,7 @@ export async function runCheckpoint(options: RunCheckpointOptions): Promise<Chec
     runId,
     outcome: "REJECTED",
     commit,
+    anchorRef: "",
     repositoryRoot: "",
     worktreePath,
     resultFile,
@@ -223,6 +263,22 @@ export async function runCheckpoint(options: RunCheckpointOptions): Promise<Chec
     });
   }
 
+  // The anchor is a NAME resolved server-side, never the ambient HEAD, and a
+  // supplied ref is only honoured inside the executor's run-branch namespace.
+  const requestedRef = (options.ref ?? "").trim();
+  if (requestedRef !== "" && !RUN_BRANCH.test(requestedRef)) {
+    return finish({
+      error: {
+        code: "UNTRUSTED_REF",
+        message:
+          `Ref ${requestedRef} is not a server-owned modernization run branch. ` +
+          `Only ${INTEGRATION_BRANCH} (by default) and lcw/modernization/<uuid> are trusted as anchors.`,
+      },
+    });
+  }
+  const anchorRef = requestedRef === "" ? INTEGRATION_BRANCH : requestedRef;
+  result.anchorRef = anchorRef;
+
   let root: string;
   try {
     root = await resolveRepositoryRoot();
@@ -237,23 +293,50 @@ export async function runCheckpoint(options: RunCheckpointOptions): Promise<Chec
     return finish({ error: { code: "COMMIT_NOT_FOUND", message: `Commit ${commit} does not exist in ${root}.` } });
   }
 
+  // The anchor must exist. Resolving it by name also rules out a commit that
+  // is merely reachable from some ref this server does not own.
   try {
-    await git(root, ["merge-base", "--is-ancestor", commit, "HEAD"]);
+    await git(root, ["rev-parse", "--verify", `refs/heads/${anchorRef}^{commit}`]);
+  } catch {
+    return finish({
+      error: {
+        code: "REF_NOT_FOUND",
+        message: `Anchor ref ${anchorRef} does not exist in ${root}.`,
+      },
+    });
+  }
+
+  // Containment in the anchor, not descent from whatever happens to be checked
+  // out. The engine re-checks this itself against the worktree HEAD; doing it
+  // here first makes the reason unambiguous.
+  try {
+    await git(root, ["merge-base", "--is-ancestor", commit, `refs/heads/${anchorRef}`]);
   } catch {
     return finish({
       error: {
         code: "COMMIT_NOT_ANCESTOR",
         message:
-          `Commit ${commit} is not an ancestor of HEAD in ${root}. The engine refuses this too; ` +
+          `Commit ${commit} is not contained in ${anchorRef} in ${root}. The engine refuses this too; ` +
           "it is checked first here so the reason is unambiguous.",
       },
     });
   }
 
-  // Detached, so no branch ref is left behind and the run is identified by the
-  // commit SHA alone.
   try {
-    await git(root, ["worktree", "add", "--detach", worktreePath, commit], WORKTREE_TIMEOUT_MS);
+    // Baseline subject: detached at the commit, so no branch ref is touched and
+    // the run is identified by the SHA alone.
+    // Modernization subject: attached to the run branch that holds it, so the
+    // engine's `git revert` produces a persistent rollback commit on a
+    // server-owned branch instead of one lost with a detached HEAD.
+    await git(
+      root,
+      requestedRef === ""
+        ? ["worktree", "add", "--detach", worktreePath, commit]
+        // A branch NAME attaches; a full ref path would silently detach, which
+        // would let the engine's `git revert` evaporate when the worktree goes.
+        : ["worktree", "add", worktreePath, anchorRef],
+      WORKTREE_TIMEOUT_MS,
+    );
     result.worktreeCreated = true;
   } catch (err) {
     return finish({ error: { code: "WORKTREE_CREATE_FAILED", message: (err as Error).message } });

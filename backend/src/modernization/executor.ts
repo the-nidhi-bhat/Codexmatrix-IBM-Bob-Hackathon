@@ -61,12 +61,24 @@ const execFileAsync = promisify(execFile);
  * The branch a modernization run is based on. Read-only for this module: it is
  * resolved to a commit and used as a base, never checked out or moved.
  */
-const INTEGRATION_BRANCH = "integration/final";
+export const INTEGRATION_BRANCH = "integration/final";
+
+/** One definition of a run id, shared with the checkpoint runner. */
+const RUN_ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 /** The only caller-supplied value that reaches a git argument list. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = new RegExp(`^${RUN_ID}$`, "i");
 
 const BRANCH_PREFIX = "lcw/modernization/";
+
+/**
+ * The only ref namespace the executor creates, and therefore the only run ref
+ * the checkpoint runner will anchor against or attach a worktree to. Exported
+ * so there is one definition of it: a modernization commit and the branch that
+ * holds it must never be recognised by two different patterns.
+ */
+export const RUN_BRANCH = new RegExp(`^${BRANCH_PREFIX}${RUN_ID}$`, "i");
+
 const GIT_TIMEOUT_MS = 5 * 60 * 1000;
 const SYNTAX_TIMEOUT_MS = 30_000;
 
