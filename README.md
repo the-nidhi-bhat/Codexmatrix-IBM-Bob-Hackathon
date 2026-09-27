@@ -197,11 +197,12 @@ Run against the application code at `c0760c7`; this release pass changes documen
 | Frontend contract tests (`frontend/npm test`) | Passed: 16 tests, 0 failed |
 | Frontend TypeScript and production build | Passed; Vite reports a large-chunk warning for the Mermaid bundle |
 | Frontend lint (`frontend/npm run lint`) | Passed with two warnings: Fast Refresh export pattern and a state update inside an effect |
+| Checkpoint refusal tests (`node tools/checkpoint.test.js`) | Passed: 6 tests, 0 failed |
 | Legacy Docker behavioral suite (`node tools/validate.js`) | Passed: 18 tests, 0 failed |
 | Tracked credential check | Passed as part of backend tests; no credential material reported as tracked |
 | Browser smoke test | Not run because no browser session was available |
 
-The standalone checkpoint refusal self-test is run from a clean worktree because it explicitly checks dirty-tree refusal. Its final result is recorded after the release commit.
+The checkpoint refusal test requires a clean worktree because it checks that dirty-tree refusal works.
 
 ## Limitations and deployment
 
