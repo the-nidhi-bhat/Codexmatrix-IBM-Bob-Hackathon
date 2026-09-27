@@ -5,7 +5,7 @@
 **Branch:** `arati/risk-analysis`  
 **Baseline commit for this revision:** `97ca37f` (v1 analysis) → improved in this commit  
 **Steps already applied at this revision:** Step 1 (F-18 type guard), Step 2 (node-uuid → uuid@9.0.1)  
-**Reference:** [`ASSESS.md`](../../ASSESS.md) · [`PLAN.md`](../../PLAN.md)  
+**Reference:** [`ASSESS.md`](../../../ASSESS.md) · [`PLAN.md`](../../../PLAN.md)\
 **Safety net:** 18/18 tests — not touched by this document
 
 > **v2 improvements over v1:** Added new findings (F-23 through F-28) not covered
@@ -21,7 +21,7 @@
 
 ### Step 1 — F-18 resolved: `validate()` type guard ✅
 
-**File:** [`server/game/index.js`](../../server/game/index.js) line 61  
+**File:** [`server/game/index.js`](../../../server/game/index.js) line 61\
 **Evidence in current code:**
 ```js
 socket.on('submitExpression', function (data) {
@@ -34,8 +34,8 @@ socket.on('submitExpression', function (data) {
 
 ### Step 2 — F-11 resolved: `node-uuid` → `uuid@9.0.1` ✅
 
-**File:** [`server/game/index.js`](../../server/game/index.js) lines 13 and 21  
-**File:** [`package.json`](../../package.json) line 12  
+**File:** [`server/game/index.js`](../../../server/game/index.js) lines 13 and 21\
+**File:** [`package.json`](../../../package.json) line 12\
 **Evidence in current code:**
 ```js
 // server/game/index.js line 13
@@ -56,7 +56,7 @@ var gameId = uuidv4();
 
 ### F-12 — `node-expression-eval@0.1.x` unmaintained · **MEDIUM risk** · Step 3
 
-**File:** [`server/game/index.js`](../../server/game/index.js) lines 12, 66–71  
+**File:** [`server/game/index.js`](../../../server/game/index.js) lines 12, 66–71\
 **Evidence:**
 ```js
 // line 12 — still the unmaintained package
@@ -92,8 +92,8 @@ catch(e) {
 
 ### F-13 — Server start is a module side-effect · **MEDIUM risk** · Step 4
 
-**File:** [`index.js`](../../index.js) line 1  
-**File:** [`server/index.js`](../../server/index.js) lines 43–44  
+**File:** [`index.js`](../../../index.js) line 1\
+**File:** [`server/index.js`](../../../server/index.js) lines 43–44\
 **Evidence:**
 ```js
 // index.js line 1 — require triggers HTTP bind immediately
@@ -129,7 +129,7 @@ var proc = spawn(process.execPath, ['-r', PRELOAD, path.join(APP_DIR, 'index.js'
 
 ### F-14 — Global mutable `gameList` and `numConnections` · **MEDIUM risk** · Future phase
 
-**File:** [`server/index.js`](../../server/index.js) lines 25–26  
+**File:** [`server/index.js`](../../../server/index.js) lines 25–26\
 **Evidence:**
 ```js
 var gameList = [];
@@ -150,8 +150,8 @@ var numConnections = 0;
 
 ### F-15 — `setInterval` not cleared on process exit · **LOW risk** · Step 4 / future
 
-**File:** [`server/game/timer.js`](../../server/game/timer.js) line 77  
-**File:** [`server/index.js`](../../server/index.js) lines 103–106  
+**File:** [`server/game/timer.js`](../../../server/game/timer.js) line 77\
+**File:** [`server/index.js`](../../../server/index.js) lines 103–106\
 **Evidence:**
 ```js
 // timer.js line 77 — interval stored in closure-local variable; no way to access from outside
@@ -169,7 +169,7 @@ process.on('SIGINT', function() {
 
 ### F-02 / F-03 / F-04 / F-05 / F-10 — Express 3 boot failure · **HIGH risk** · Step 5
 
-**File:** [`server/index.js`](../../server/index.js) lines 29–40  
+**File:** [`server/index.js`](../../../server/index.js) lines 29–40\
 **Evidence — complete block that must be replaced:**
 ```js
 var app = express();
@@ -202,7 +202,7 @@ This asserts status 200 and non-zero body bytes. After Step 5, `express.static` 
 
 ### F-06 / F-07 / F-08 / F-09 — Socket.IO 0.9 boot failure · **HIGH risk** · Step 6
 
-**File:** [`server/index.js`](../../server/index.js) lines 48–56  
+**File:** [`server/index.js`](../../../server/index.js) lines 48–56\
 **Evidence — complete block that must be replaced:**
 ```js
 var io = require('socket.io').listen(server);    // line 48 — .listen() still works in Socket.IO 4
@@ -262,7 +262,7 @@ In socket.io-client 4.x, the polling transport is implemented directly (no `xmlh
 
 ### F-16 — `layer` ReferenceError in `helpDialog.toggle()` · **LOW risk** · Step 7
 
-**File:** [`public/js/StageController.js`](../../public/js/StageController.js) line 98  
+**File:** [`public/js/StageController.js`](../../../public/js/StageController.js) line 98\
 **Evidence:**
 ```js
 helpDialog.toggle = function () {
@@ -280,7 +280,7 @@ helpDialog.toggle = function () {
 
 ### F-17 — `blink || true` ignores the `blink` parameter · **LOW risk** · Step 7
 
-**File:** [`public/js/StageController.js`](../../public/js/StageController.js) lines 281, 312  
+**File:** [`public/js/StageController.js`](../../../public/js/StageController.js) lines 281, 312\
 **Evidence:**
 ```js
 // line 281 — willBlink is always true regardless of argument
@@ -297,8 +297,8 @@ this.showEvaluatedText(data.expression, '#dd0000', false, 5000);
 
 ### F-20 — KineticJS 4.6.0 abandoned · **MEDIUM-HIGH risk** · Step 7
 
-**File:** [`public/js/StageController.js`](../../public/js/StageController.js) — throughout  
-**File:** [`public/index.html`](../../public/index.html) line 12  
+**File:** [`public/js/StageController.js`](../../../public/js/StageController.js) — throughout\
+**File:** [`public/index.html`](../../../public/index.html) line 12\
 
 **All KineticJS API calls and their Konva 9.3.18 status:**
 
@@ -379,7 +379,7 @@ this.showEvaluatedText(data.expression, '#dd0000', false, 5000);
 
 ### F-23 — `gameList` recycling is silent and unobservable · **LOW risk** · Note for future phase
 
-**File:** [`server/index.js`](../../server/index.js) lines 61–80  
+**File:** [`server/index.js`](../../../server/index.js) lines 61–80\
 **Evidence:**
 ```js
 if (gameList.length === 0) {
@@ -411,7 +411,7 @@ if (gameList.length === 0) {
 
 ### F-24 — `timer.js` initializes 7 variables to `undefined` explicitly · **NEGLIGIBLE risk** · Code quality note
 
-**File:** [`server/game/timer.js`](../../server/game/timer.js) lines 40–46  
+**File:** [`server/game/timer.js`](../../../server/game/timer.js) lines 40–46\
 **Evidence:**
 ```js
 var time = undefined;
@@ -430,8 +430,8 @@ var loop = undefined;
 
 ### F-25 — `getRandomCard()` difficulty distribution: `mediumCutoff` value creates 50/30/20 split, not 33/33/33 · **NEGLIGIBLE risk** · Documentation gap
 
-**File:** [`server/game/config.json`](../../server/game/config.json)  
-**File:** [`server/game/index.js`](../../server/game/index.js) lines 143–161  
+**File:** [`server/game/config.json`](../../../server/game/config.json)\
+**File:** [`server/game/index.js`](../../../server/game/index.js) lines 143–161\
 **Evidence:**
 ```json
 { "maxPlayers": 4, "initialTimer": 300, "mediumCutoff": 0.5, "easyCutoff": 0.8 }
@@ -462,8 +462,8 @@ Any change to `getRandomCard()` or the RNG seed would invalidate these constants
 
 ### F-26 — `cards.json` contains multi-digit repeated-digit cards: `validate()` handles them correctly but the path is non-obvious · **LOW risk** · Code analysis
 
-**File:** [`server/game/cards.json`](../../server/game/cards.json) — easy and hard cards  
-**File:** [`server/game/index.js`](../../server/game/index.js) lines 89–122  
+**File:** [`server/game/cards.json`](../../../server/game/cards.json) — easy and hard cards\
+**File:** [`server/game/index.js`](../../../server/game/index.js) lines 89–122\
 **Evidence (examples of cards with repeated digits):**
 ```
 easy: "1266" (two 6s), "2488" (two 8s), "1148" (two 1s), "1156" (two 5s)
@@ -548,7 +548,7 @@ This change also incorporates the transport restriction (Break 3 from Section 2)
 
 ## 4. `validate()` Logic — Comprehensive Analysis
 
-**File:** [`server/game/index.js`](../../server/game/index.js) lines 89–122
+**File:** [`server/game/index.js`](../../../server/game/index.js) lines 89–122
 
 ### 4.1 Already documented
 
