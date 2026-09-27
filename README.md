@@ -36,7 +36,7 @@ flowchart LR
   G -->|Regression| I[git revert the modernization commit]
   I --> J[Re-run behavioral suite]
   J -->|Pass| K[RECOVERY_VERIFIED]
-  J -->|Fail| L[RECOVERY_FAILED; inspect result]
+  J -->|Fail| L[RECOVERY_FAILED, inspect result]
 ```
 
 The **repository URL stage analyzes the clone**. The **modernization/checkpoint stage operates on the checked-out Legacy Code Whisperer repository and its included Get24 target**. Do not treat an analysis result for another repository as authorization to modify that repository.
@@ -93,11 +93,11 @@ sequenceDiagram
   participant Engine as Checkpoint engine
   participant Tests as Docker legacy suite
   UI->>API: execute(analysisRunId, operationId)
-  API->>Git: create worktree from main; create server-owned run ref
+  API->>Git: create worktree from main, then create server-owned run ref
   Git-->>API: modernization commit
   UI->>API: create checkpoint, then verify(checkpointRunId)
   API->>Engine: resolve commit and trusted run ref server-side
-  Engine->>Git: verify full SHA ancestry; create temporary worktree
+  Engine->>Git: verify full SHA ancestry, then create temporary worktree
   Engine->>Tests: run behavioral tests
   Tests-->>Engine: pass or regression
   alt Tests pass
