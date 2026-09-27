@@ -1,0 +1,614 @@
+/* ──────────────────────────────────────────────────
+   Landing page — public entry point
+
+   Extracted from Iffa's design (origin/iffa/ui-repo-entry @ 2ea5d82) for
+   LandingScreen.tsx and Texture.tsx only. Her App.css and index.css were NOT
+   taken wholesale: they restyle the whole app shell and every existing screen.
+
+   Everything here is scoped under `.land`, the landing page's own root class
+   (see screens/LandingScreen.tsx). Custom properties inherit, so the light
+   "paper" palette is re-declared on `.land` and reaches the landing subtree
+   and nothing else. Shared primitives (.card, .btn, .row, .note, ...) are
+   prefixed with `.land ` so they cannot leak into any existing screen.
+   ────────────────────────────────────────────────── */
+
+.land {
+  /* paper ground + ink. The application is dark-themed, so the landing page
+     carries its own surface rather than changing body. */
+  --paper: #faf9f6;
+  --card: #ffffff;
+  --sunk: #f4f2ec;
+  --line: #e6e2d9;
+  --line-2: #d7d2c6;
+  --text: #1b1a17;
+  --text-2: #56514a;
+  --muted: #8b857a;
+  --accent: #0d6e66;
+  --accent-ink: #0a544e;
+  --accent-soft: #e4f0ee;
+  --green: #2c6e49;
+  --green-soft: #e7f1ea;
+  --yellow: #8a6100;
+  --yellow-soft: #faf1da;
+  --red-soft: #fbeae8;
+  --purple: #5b5a8f;
+  --blue-soft: #e9eef4;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-xs: 0 1px 1px rgba(27, 26, 23, 0.04);
+  --shadow-sm: 0 1px 2px rgba(27, 26, 23, 0.05), 0 2px 6px -3px rgba(27, 26, 23, 0.08);
+  --shadow-md: 0 1px 2px rgba(27, 26, 23, 0.05), 0 10px 28px -16px rgba(27, 26, 23, 0.28);
+  --sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --mono: "SF Mono", "Cascadia Mono", "JetBrains Mono", "Consolas", ui-monospace, monospace;
+
+  /* a fine fibrous grain laid over every surface */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
+
+  /* engineering graph paper, two scales, under a soft raking light */
+  --graph:
+    radial-gradient(1240px 660px at 16% -14%, rgba(13, 110, 102, 0.055), transparent 62%),
+    linear-gradient(to right, rgba(27, 26, 23, 0.075) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(27, 26, 23, 0.075) 1px, transparent 1px),
+    linear-gradient(to right, rgba(27, 26, 23, 0.036) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(27, 26, 23, 0.036) 1px, transparent 1px);
+  --graph-size: auto, 96px 96px, 96px 96px, 16px 16px, 16px 16px;
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  background-color: var(--paper);
+  background-image: var(--graph);
+  background-size: var(--graph-size);
+}
+
+.land-wrap {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* -- header ---------------------------------------------------- */
+
+.land-top {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  padding: 0 32px;
+  background: rgba(250, 249, 246, 0.94);
+  -webkit-backdrop-filter: saturate(1.35) blur(8px);
+  backdrop-filter: saturate(1.35) blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.land .land-top .brand { color: var(--text); border-bottom: none; }
+
+.land-nav {
+  display: flex;
+  gap: 2px;
+  margin-right: auto;
+}
+
+.land .land-nav a {
+  color: var(--text-2);
+  font-size: 13.5px;
+  padding: 7px 12px;
+  border-radius: 7px;
+  border-bottom: none;
+  transition: background 0.15s, color 0.15s;
+}
+.land .land-nav a:hover { background: rgba(255, 255, 255, 0.78); color: var(--text); }
+
+.land-top-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* -- hero ------------------------------------------------------ */
+
+.land-hero {
+  position: relative;
+  padding: 96px 0 88px;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.land-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 780px;
+}
+
+.land-title {
+  font-family: var(--serif);
+  font-size: clamp(38px, 5.4vw, 64px);
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.028em;
+  margin-top: 22px;
+  max-width: 17ch;
+}
+.land-title em { font-style: normal; color: var(--accent); }
+
+.land-lede {
+  font-size: 17.5px;
+  line-height: 1.66;
+  color: var(--text-2);
+  max-width: 62ch;
+  margin-top: 24px;
+}
+
+.land-cta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 36px;
+}
+
+.land .land-link {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--line-2);
+  padding-bottom: 3px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.land .land-link:hover { color: var(--text); border-bottom-color: var(--text); }
+
+.land-facts {
+  margin-top: 46px;
+  max-width: 800px;
+}
+
+/* -- sections -------------------------------------------------- */
+
+.land-band { border-bottom: 1px solid var(--line); }
+
+.land-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 88px 32px;
+}
+
+.land-head {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 42px;
+}
+
+.land-index {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  padding-top: 9px;
+}
+
+.land-h2 {
+  font-family: var(--serif);
+  font-size: clamp(27px, 3vw, 36px);
+  font-weight: 500;
+  line-height: 1.16;
+  letter-spacing: -0.02em;
+}
+
+.land-sub {
+  font-size: 15px;
+  line-height: 1.66;
+  color: var(--text-2);
+  max-width: 68ch;
+  margin-top: 12px;
+}
+
+/* capability cards */
+
+.land-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.land-card {
+  padding: 24px;
+  border-top: 2px solid var(--text);
+}
+
+.land-card-n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+.land-card-t {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  margin-top: 14px;
+}
+.land-card-d {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  margin-top: 8px;
+}
+
+/* flow stages */
+
+.land-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 26px;
+}
+
+.land-stage {
+  border-top: 2px solid var(--text);
+  padding-top: 15px;
+  padding-right: 6px;
+}
+
+.land-stage-n {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.land-stage-t {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  margin-top: 9px;
+}
+.land-stage:not(:last-child) .land-stage-t::after {
+  content: "\2192";
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--muted);
+  margin-left: 10px;
+  vertical-align: 2px;
+}
+
+.land-stage-d {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  margin-top: 9px;
+}
+
+/* safety */
+
+.land-safety {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 44px;
+  align-items: start;
+}
+
+.land-checks {
+  list-style: none;
+  display: grid;
+  gap: 14px;
+}
+
+.land-check {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  padding: 20px 22px;
+}
+
+.land-check-i {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--green-soft);
+  border: 1px solid #cfe2d7;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.land-check-t {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.land-check-d {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  margin-top: 6px;
+}
+
+/* final CTA */
+
+.land-final {
+  background-color: var(--accent-soft);
+  background-image: var(--grain);
+  background-size: 200px 200px;
+  border-bottom: 1px solid #cbe3df;
+}
+
+.land-final-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 76px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.land-final .land-sub { color: var(--text-2); }
+
+/* footer */
+
+.land-foot {
+  max-width: 1200px;
+  width: 100%;
+  margin: auto auto 0;
+  padding: 30px 32px 44px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* -- primitives the landing page reuses, scoped to .land ---------- */
+
+/* app.css .tex / .tex-diff — the background diff artwork in Texture.tsx */
+.land .tex {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  height: auto;
+}
+
+.land .tex-diff {
+  left: 0;
+  top: 26px;
+  width: 460px;
+  max-width: 62%;
+  opacity: 0.74;
+  -webkit-mask-image: linear-gradient(158deg, rgba(0, 0, 0, 0.98) 6%, rgba(0, 0, 0, 0.4) 46%, transparent 74%);
+  mask-image: linear-gradient(158deg, rgba(0, 0, 0, 0.98) 6%, rgba(0, 0, 0, 0.4) 46%, transparent 74%);
+}
+
+/* app.css .brand / .brand-mark / .brand-name / .brand-rule */
+.land .brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.land .brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--text);
+  color: #fbfaf7;
+  display: grid;
+  place-items: center;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.land .brand-name {
+  font-family: var(--serif);
+  font-size: 16.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+.land .brand-rule {
+  width: 1px;
+  height: 18px;
+  background: var(--line-2);
+  flex-shrink: 0;
+}
+
+/* app.css .eyebrow */
+.land .eyebrow {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* app.css .demo-chip */
+.land .demo-chip {
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: var(--yellow-soft);
+  border: 1px solid #eddfba;
+  color: var(--yellow);
+}
+
+/* app.css .start-eyebrow / .start-trust — the landing hero reuses them */
+.land .start-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 10.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  margin-bottom: 26px;
+}
+.land .start-eyebrow::before {
+  content: "";
+  width: 26px;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+
+.land .start-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.land .start-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.land .start-trust span::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
+/* index.css .lede */
+.land .lede {
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+/* index.css .card — our index.css also defines a dark .card globally, but
+   .land .card has higher specificity and only matches inside the landing page */
+.land .card {
+  background-color: var(--card);
+  background-image: var(--grain);
+  background-size: 200px 200px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow-xs);
+}
+
+/* index.css .row */
+.land .row { display: flex; align-items: center; }
+
+/* index.css .btn / .btn-solid / .btn-lg */
+.land .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.land .btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.land .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.land .btn-solid {
+  background: var(--text);
+  color: #fbfaf7;
+  box-shadow: var(--shadow-xs);
+}
+.land .btn-solid:hover:not(:disabled) { background: #000; }
+
+.land .btn-lg { padding: 11px 22px; font-size: 14px; border-radius: 8px; }
+
+/* index.css .note / .note-accent / .note-title / .note-body */
+.land .note {
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background-color: var(--card);
+  background-image: var(--grain);
+  background-size: 200px 200px;
+  padding: 16px 18px;
+}
+.land .note-accent  { background-color: var(--accent-soft); border-color: #cbe3df; }
+
+.land .note-title {
+  font-weight: 650;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.land .note-body {
+  color: var(--text-2);
+  font-size: 13px;
+  margin-top: 3px;
+  line-height: 1.6;
+}
+
+/* -- landing responsive ---------------------------------------- */
+
+@media (max-width: 1100px) {
+  .land-top .eyebrow { display: none; }
+}
+
+@media (max-width: 1040px) {
+  .land-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .land-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px 26px; }
+  .land-safety { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+}
+
+@media (max-width: 900px) {
+  .land-top { gap: 16px; padding: 0 20px; }
+  .land-top .eyebrow { display: none; }
+  .land-nav { display: none; }
+  .land-top-right { margin-left: auto; }
+  .land-hero { padding: 62px 0 58px; }
+  .land-wrap { padding: 0 20px; }
+  .land-section { padding: 62px 20px; }
+  .land-final-inner { padding: 58px 20px; }
+  .land-foot { padding: 26px 20px 38px; }
+  .land-head { gap: 16px; margin-bottom: 32px; }
+}
+
+@media (max-width: 620px) {
+  .land-grid, .land-flow { grid-template-columns: minmax(0, 1fr); }
+  .land-title { font-size: 33px; }
+  .land-lede { font-size: 16px; }
+  .land-cta { gap: 16px; }
+  .land-cta .btn { width: 100%; }
+  .land-top-right .btn { display: none; }
+  .land-stage-t::after { content: none; }
+  .land-final-inner .btn { width: 100%; }
+}

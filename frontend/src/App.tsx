@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import LandingScreen from "./screens/LandingScreen";
 import StartScreen from "./screens/StartScreen";
 import ArchitectureScreen from "./screens/ArchitectureScreen";
 import OverviewScreen from "./screens/OverviewScreen";
@@ -260,6 +261,7 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
 // ── App state machine ─────────────────────────────────────────────────────────
 
 type AppPhase =
+  | { kind: "landing" }
   | { kind: "start" }
   | { kind: "loading"; repoUrl: string }
   | { kind: "error"; repoUrl: string; message: string; code: string }
@@ -268,10 +270,16 @@ type AppPhase =
 // ── Root App — entry gate + provider ─────────────────────────────────────────
 
 export default function App() {
-  const [phase, setPhase] = useState<AppPhase>({ kind: "start" });
+  // The landing page is the public entry point. Its CTA drops into the existing
+  // repository-input screen, so analysis -> execute -> verify is unchanged.
+  const [phase, setPhase] = useState<AppPhase>({ kind: "landing" });
   const requestController = useRef<AbortController | null>(null);
 
   useEffect(() => () => requestController.current?.abort(), []);
+
+  function goToStart() {
+    setPhase({ kind: "start" });
+  }
 
   async function handleStart(repoUrl: string) {
     requestController.current?.abort();
@@ -290,6 +298,10 @@ export default function App() {
     } finally {
       if (requestController.current === controller) requestController.current = null;
     }
+  }
+
+  if (phase.kind === "landing") {
+    return <LandingScreen onAnalyze={goToStart} />;
   }
 
   if (phase.kind === "start") {
