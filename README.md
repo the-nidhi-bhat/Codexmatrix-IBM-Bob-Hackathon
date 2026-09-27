@@ -124,16 +124,7 @@ A checkpoint aborts **before touching the repository** if the worktree is dirty,
 
 Every number below comes from a real run on this repository, not from a target.
 
-| Run | Safety net | Outcome |
-|---|---|---|
-| Baseline, before any change | 18/18 | known-good |
-| `6393892` — F-11, `node-uuid` → `uuid@9.0.1` | 18/18 | `VERIFIED`, exit 0 |
-| Deliberate regression: Socket.IO `connected` renamed to `connected2` | 16/18 | detected |
-| Same run, automatic rollback | 18/18 | `RECOVERY_VERIFIED`, exit 1 |
-| Orchestrator self-tests | 6/6 | refusals hold, no Docker required |
-| End-to-end through the web UI (clone → Apply → Run checkpoint) | 18/18 | `VERIFIED` |
 
-The regression run is in the history on purpose: the breaking commit and its revert are both present, so the safety property is demonstrated by the repository state rather than asserted.
 
 ## The protected safety net
 
