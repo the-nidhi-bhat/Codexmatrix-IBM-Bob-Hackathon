@@ -1,12 +1,15 @@
 # IBM Bob development evidence
 
-This directory holds the preserved IBM Bob development evidence for ForgeFlow.
+This directory holds preserved session summaries related to Legacy Code Whisperer.
+The summaries were produced with more than one tool; see each file's provenance
+and [INDEX.md](INDEX.md) before attributing work to IBM Bob.
 
 ## What is in here
 
-Each file is a dated **Task Session Summary**: the record of one Bob working
-session, written at the time it happened. They are kept in chronological order
-and are named `YYYY-MM-DD-<milestone>.md`.
+Each file is a dated **Task Session Summary**, named
+`YYYY-MM-DD-<milestone>.md`. These historical records are preserved as written;
+some headers contain attribution errors documented in
+[`../IBM_BOB/README.md`](../IBM_BOB/README.md).
 
 | File | Milestone |
 |---|---|
@@ -19,8 +22,8 @@ See [INDEX.md](INDEX.md) for the evidence-to-area mapping.
 
 ## How the evidence maps to the project
 
-The sessions follow the project's own safety-first sequence, so the directory
-doubles as a record of how the product was built:
+The summaries cover planning and implementation work across the project. They
+are not all IBM Bob sessions:
 
 1. **Execution plan** — the modernization steps, each with its verification
    command and rollback condition (mirrors [`../PLAN.md`](../PLAN.md)).
@@ -35,7 +38,7 @@ doubles as a record of how the product was built:
    ([`../tools/checkpoint.js`](../tools/checkpoint.js),
    [`../backend/src/routes/checkpoint.ts`](../backend/src/routes/checkpoint.ts)).
 
-The longer-running Bob usage log, change log and prompt log live in
+The longer-running usage log, change log and prompt log live in
 [`../IBM_BOB/`](../IBM_BOB/); `IBM_BOB/README.md` states which tool produced
 each record there.
 

@@ -22,7 +22,7 @@ SOFTWARE.
 
 ---
 
-This license covers the ForgeFlow project code in this repository.
+This license covers the Legacy Code Whisperer project code in this repository.
 
 The imported legacy application under index.js, package.json, public/ and
 server/ is (c) its original authors and is used under the MIT License; that
