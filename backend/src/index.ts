@@ -1,12 +1,11 @@
 import { createApp } from "./app";
+import { loadServerConfig } from "./config";
 
-const app = createApp();
-const PORT = parseInt(process.env.PORT ?? "3001", 10);
+const config = loadServerConfig();
+const app = createApp(config);
 
-// ponytail: loopback-only, no auth — fine for the local demo. Bind 0.0.0.0 plus a
-// shared token if this ever runs on a shared machine.
-app.listen(PORT, "127.0.0.1", () => {
-  console.log(`Legacy Code Whisperer backend running on http://localhost:${PORT}`);
+app.listen(config.port, config.host, () => {
+  console.log(`Legacy Code Whisperer backend listening on ${config.host}:${config.port}`);
   console.log(`POST /api/analyze   — analyze a GitHub repository`);
   console.log(`GET  /api/runs/:id  — retrieve a run by ID`);
   console.log(`POST /api/checkpoint-runs — create a checkpoint run from an analysis run ID`);

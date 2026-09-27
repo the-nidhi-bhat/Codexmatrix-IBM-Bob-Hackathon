@@ -65,7 +65,7 @@ flowchart LR
   Suite -->|fail| Revert[git revert and recovery verification]
 ```
 
-The backend uses Git and Docker for its local workflow. It binds to `127.0.0.1`, has no application authentication, and stores API run records in process memory. No database or deployed API service is configured.
+The backend uses Git and Docker for its local workflow. Local development binds to `127.0.0.1` and does not require authentication. Production/non-loopback binding requires a server-side bearer token, and `/api/health` remains public for host probes. API run records are held in process memory. No database or deployed API service is configured; see [backend deployment configuration](backend/README.md#local-development) for the server requirements and current frontend integration limitation.
 
 ## Frontend
 

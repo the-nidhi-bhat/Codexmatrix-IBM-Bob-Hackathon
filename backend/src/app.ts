@@ -3,6 +3,8 @@ import cors from "cors";
 import analyzeRouter from "./routes/analyze";
 import checkpointRouter from "./routes/checkpoint";
 import modernizationRouter from "./routes/modernization";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { loadServerConfig, ServerConfig } from "./config";
 
 /**
  * Build the API app. Everything about the request pipeline is here so it can be
@@ -10,10 +12,45 @@ import modernizationRouter from "./routes/modernization";
  * assembles its own copy of the middleware stack proves nothing about the app
  * that actually serves requests.
  */
-export function createApp(): express.Express {
+function matchesToken(candidate: string, expected: string): boolean {
+  const candidateDigest = createHash("sha256").update(candidate, "utf8").digest();
+  const expectedDigest = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(candidateDigest, expectedDigest);
+}
+
+export function createApp(config: ServerConfig = loadServerConfig()): express.Express {
   const app = express();
 
-  app.use(cors({ origin: ["http://localhost:5173", "http://localhost:4173"] }));
+  const allowedOrigins = ["http://localhost:5173", "http://localhost:4173", config.frontendOrigin]
+    .filter((origin): origin is string => Boolean(origin));
+  app.use(cors({
+    origin: (origin, callback) => callback(null, origin === undefined || allowedOrigins.includes(origin)),
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }));
+
+  // CORS handles browser preflights before this gate. Health remains public for
+  // host probes; every other API route is protected whenever a token is set.
+  app.use("/api", (req, res, next) => {
+    if (req.method === "OPTIONS" || (req.method === "GET" && req.path === "/health")) {
+      next();
+      return;
+    }
+    if (!config.apiAuthToken) {
+      next();
+      return;
+    }
+    const match = /^Bearer ([^\s]+)$/i.exec(req.get("authorization") ?? "");
+    if (!match || !matchesToken(match[1], config.apiAuthToken)) {
+      res.status(401).json({
+        success: false,
+        error: { code: "UNAUTHORIZED", message: "A valid bearer token is required.", phase: "UNDERSTAND" },
+      });
+      return;
+    }
+    next();
+  });
+
   app.use(express.json({ limit: "1mb" }));
 
   // Mount routes
