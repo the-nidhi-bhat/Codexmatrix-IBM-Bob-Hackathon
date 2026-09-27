@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import LandingScreen from "./screens/LandingScreen";
 import StartScreen from "./screens/StartScreen";
 import ArchitectureScreen from "./screens/ArchitectureScreen";
 import OverviewScreen from "./screens/OverviewScreen";
@@ -11,6 +12,7 @@ import ReportScreen from "./screens/ReportScreen";
 import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
 import type { WorkflowState } from "./workflow/types";
 import { analyzeRepository, getRun, startExecution, startVerification, WorkflowApiError } from "./api/workflowApi";
+import { PipelineTexture } from "./Texture";
 import "./App.css";
 
 type Screen = "architecture" | "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
@@ -18,22 +20,21 @@ type Screen = "architecture" | "overview" | "risk" | "plan" | "execution" | "ver
 interface NavItem {
   id: Screen;
   label: string;
-  icon: string;
 }
 
 const NAV: NavItem[] = [
-  { id: "architecture",   label: "Architecture",   icon: "⬡" },
-  { id: "overview",      label: "Overview",      icon: "◈" },
-  { id: "risk",          label: "Risk",           icon: "⚠" },
-  { id: "plan",          label: "Plan",           icon: "☰" },
-  { id: "execution",     label: "Execution",      icon: "▶" },
-  { id: "verification",  label: "Verification",   icon: "✔" },
-  { id: "rollback",      label: "Rollback",       icon: "↺" },
-  { id: "report",        label: "Report",         icon: "📋" },
+  { id: "architecture", label: "Architecture" },
+  { id: "overview",     label: "Overview" },
+  { id: "risk",         label: "Risk" },
+  { id: "plan",         label: "Plan" },
+  { id: "execution",    label: "Execution" },
+  { id: "verification", label: "Verification" },
+  { id: "rollback",     label: "Rollback" },
+  { id: "report",       label: "Report" },
 ];
 
 const PHASE_LABELS: Record<Screen, string> = {
-  architecture:  "Understand",
+  architecture: "Understand",
   overview:     "Understand · Protect",
   risk:         "Assess",
   plan:         "Plan",
@@ -42,6 +43,21 @@ const PHASE_LABELS: Record<Screen, string> = {
   rollback:     "Rollback · Recover",
   report:       "Report",
 };
+
+function safetyPillState(status?: string): { className: string; label: string } {
+  switch (status) {
+    case "running":
+      return { className: "safety-pill is-run", label: "Safety net · running" };
+    case "passed":
+      return { className: "safety-pill is-ok", label: "Safety net · passing" };
+    case "failed":
+      return { className: "safety-pill is-fail", label: "Safety net · failing" };
+    case "not_available":
+      return { className: "safety-pill", label: "Safety net · not available" };
+    default:
+      return { className: "safety-pill", label: "Safety net · not run" };
+  }
+}
 
 // ── Dashboard (rendered inside WorkflowProvider) ─────────────────────────────
 
@@ -89,177 +105,75 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  const pill = safetyPillState(state.checkpointResult?.status);
+  const detail = state.checkpointResult;
+  const pillTitle =
+    detail?.status === "passed" ? `Safety net · ${detail.passed}/${detail.total} passing`
+    : detail?.status === "failed" ? `Safety net · ${detail.failed} failing`
+    : pill.label;
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Top header */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 24px",
-          height: 56,
-          background: "var(--surface)",
-          borderBottom: "1px solid var(--border)",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 20, color: "var(--accent)" }}>◈</span>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>Legacy Code Whisperer</span>
-          <span
-            style={{
-              padding: "2px 8px",
-              background: "var(--accent-dim)",
-              border: "1px solid #1f6feb44",
-              borderRadius: 4,
-              fontSize: 11,
-              color: "var(--accent)",
-              fontWeight: 600,
-            }}
-          >
-            IBM Bob Hackathon
-          </span>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">L</span>
+          <span className="brand-name">Legacy Code Whisperer</span>
+          <span className="brand-rule" />
+          <span className="eyebrow">IBM Bob 2.0 · Team Codexmatrix</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          {/* Workflow phase label */}
-          <span style={{ color: "var(--muted)", fontSize: 12 }}>
-            Phase:{" "}
-            <span style={{ color: "var(--text)", fontWeight: 600 }}>
-              {PHASE_LABELS[active]}
-            </span>
+        <div className="topbar-right">
+          <span className="phase-chip">
+            <span className="phase-key">Phase</span>
+            <span className="phase-val">{PHASE_LABELS[active]}</span>
           </span>
-          {/* Checkpoint results are distinct from repository analysis checks. */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              background: "var(--surface-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 20,
-            }}
-          >
-            <span style={{ color: "var(--muted)", fontSize: 10 }}>●</span>
-            <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600 }}>
-              {state.checkpointResult?.status === "running" ? "Safety Net: running"
-                : state.checkpointResult?.status === "not_available" ? "Safety Net: not available"
-                : state.checkpointResult?.status === "passed" ? `Safety Net: ${state.checkpointResult.passed}/${state.checkpointResult.total} passed`
-                : state.checkpointResult?.status === "failed" ? `Safety Net: ${state.checkpointResult.failed} failed`
-                : "Safety Net: not run"}
-            </span>
-          </div>
-          {/* Change repo */}
-          <button
-            onClick={onChangeRepo}
-            style={{
-              padding: "4px 10px",
-              background: "transparent",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              color: "var(--muted)",
-              cursor: "pointer",
-              fontSize: 12,
-            }}
-          >
-            ← Change repo
-          </button>
+          <span className={pill.className} title={pillTitle}>{pillTitle}</span>
+          <button className="btn btn-quiet" onClick={onChangeRepo}>← Change repo</button>
         </div>
       </header>
 
-      <div style={{ display: "flex", flex: 1 }}>
-        {/* Sidebar */}
-        <aside
-          style={{
-            width: 200,
-            background: "var(--surface)",
-            borderRight: "1px solid var(--border)",
-            padding: "16px 0",
-            position: "sticky",
-            top: 56,
-            height: "calc(100vh - 56px)",
-            overflowY: "auto",
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Workflow label */}
-          <div
-            style={{
-              padding: "0 14px 10px",
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: "var(--muted)",
-            }}
-          >
-            Workflow
-          </div>
-          {/* Nav items */}
-          {NAV.map((item) => (
+      <div className="shell">
+        <aside className="rail">
+          <div className="rail-label">Workflow</div>
+
+          {NAV.map((item, index) => (
             <button
               key={item.id}
+              className={`nav-item${active === item.id ? " is-active" : ""}`}
               onClick={() => navigate(item.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "8px 14px",
-                background: active === item.id ? "var(--accent-dim)" : "transparent",
-                border: "none",
-                borderLeft: `2px solid ${active === item.id ? "var(--accent)" : "transparent"}`,
-                color: active === item.id ? "var(--accent)" : "var(--text)",
-                cursor: "pointer",
-                fontSize: 13,
-                textAlign: "left",
-                transition: "all 0.15s",
-              }}
+              aria-current={active === item.id ? "page" : undefined}
             >
-              <span style={{ fontSize: 13, width: 18, textAlign: "center" }}>{item.icon}</span>
-              <span style={{ flex: 1 }}>{item.label}</span>
+              <span className="nav-step">{String(index + 1).padStart(2, "0")}</span>
+              <span>{item.label}</span>
             </button>
           ))}
 
-          {/* Repo info at bottom */}
-          <div
-            style={{
-              padding: "14px 14px 0",
-              borderTop: "1px solid var(--border)",
-              marginTop: "auto",
-            }}
-          >
-            <div style={{ color: "var(--muted)", fontSize: 10, lineHeight: 1.9, wordBreak: "break-all" }}>
-              <div style={{ color: "var(--text)", fontWeight: 600, marginBottom: 2 }}>
-                {repository.name}
+          <div className="rail-foot">
+            <div className="rail-repo">{repository.name}</div>
+            <div className="rail-meta">{repository.runtime}</div>
+            <div className="rail-progress">
+              <div className="progress">
+                <div className="progress-fill" style={{ width: `${overallProgress}%` }} />
               </div>
-              <div>{repository.runtime}</div>
-              <div style={{ color: "var(--green)" }}>{overallProgress}% complete</div>
-              <div style={{ color: "var(--muted)", marginTop: 4, fontSize: 9, opacity: 0.7 }}>
-                {repoUrl}
-              </div>
+              <span>{overallProgress}%</span>
             </div>
+            <div className="rail-url">{repoUrl}</div>
           </div>
         </aside>
 
-        {/* Main content */}
-        <main style={{ flex: 1, padding: "28px 40px", minWidth: 0, maxWidth: 1400 }}>
+        <main className="main">
+          <PipelineTexture className="tex tex-pipe" />
           {actionError && (
-            <div role="alert" className="card" style={{ marginBottom: 16, borderColor: "var(--red)", color: "var(--red)" }}>
-              Workflow request failed: {actionError}
+            <div role="alert" className="alert">
+              <span aria-hidden="true">✕</span>
+              <span>Workflow request failed: {actionError}</span>
             </div>
           )}
-          {active === "architecture"  && <ArchitectureScreen />}
-          {active === "overview"     && <OverviewScreen repoUrl={repoUrl} />}
-          {active === "risk"         && <RiskScreen />}
-          {active === "plan"         && <PlanScreen />}
-          {active === "execution"    && (
+          {active === "architecture" && <ArchitectureScreen />}
+          {active === "overview"    && <OverviewScreen repoUrl={repoUrl} />}
+          {active === "risk"        && <RiskScreen />}
+          {active === "plan"        && <PlanScreen />}
+          {active === "execution"   && (
             <ExecutionScreen
               onVerify={() => navigate("verification")}
               onRollback={() => navigate("rollback")}
@@ -279,6 +193,7 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
 // ── App state machine ─────────────────────────────────────────────────────────
 
 type AppPhase =
+  | { kind: "landing" }
   | { kind: "start" }
   | { kind: "loading"; repoUrl: string }
   | { kind: "error"; repoUrl: string; message: string; code: string }
@@ -287,10 +202,28 @@ type AppPhase =
 // ── Root App — entry gate + provider ─────────────────────────────────────────
 
 export default function App() {
-  const [phase, setPhase] = useState<AppPhase>({ kind: "start" });
+  const [phase, setPhase] = useState<AppPhase>({ kind: "landing" });
   const requestController = useRef<AbortController | null>(null);
 
   useEffect(() => () => requestController.current?.abort(), []);
+
+  function goToStart() {
+    requestController.current?.abort();
+    requestController.current = null;
+    // Drop any lingering section anchor so the input screen opens at the top.
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    setPhase({ kind: "start" });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  function goToLanding() {
+    requestController.current?.abort();
+    requestController.current = null;
+    setPhase({ kind: "landing" });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
 
   async function handleStart(repoUrl: string) {
     requestController.current?.abort();
@@ -311,18 +244,23 @@ export default function App() {
     }
   }
 
+  if (phase.kind === "landing") {
+    return <LandingScreen onAnalyze={goToStart} />;
+  }
+
   if (phase.kind === "start") {
-    return <StartScreen onStart={handleStart} />;
+    return <StartScreen onStart={handleStart} onBack={goToLanding} />;
   }
 
   if (phase.kind === "loading") {
-    return <StartScreen onStart={handleStart} loading repoUrl={phase.repoUrl} />;
+    return <StartScreen onStart={handleStart} onBack={goToLanding} loading repoUrl={phase.repoUrl} />;
   }
 
   if (phase.kind === "error") {
     return (
       <StartScreen
         onStart={handleStart}
+        onBack={goToLanding}
         errorMessage={phase.message}
         errorCode={phase.code}
         defaultUrl={phase.repoUrl}
@@ -333,11 +271,7 @@ export default function App() {
   // phase.kind === "dashboard"
   return (
     <WorkflowProvider state={phase.workflowState}>
-      <Dashboard repoUrl={phase.repoUrl} onChangeRepo={() => {
-        requestController.current?.abort();
-        requestController.current = null;
-        setPhase({ kind: "start" });
-      }} />
+      <Dashboard repoUrl={phase.repoUrl} onChangeRepo={goToStart} />
     </WorkflowProvider>
   );
 }

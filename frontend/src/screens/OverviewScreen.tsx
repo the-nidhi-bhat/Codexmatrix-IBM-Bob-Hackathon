@@ -3,55 +3,56 @@ import type { VerificationRun } from "../workflow/types";
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div style={{ background: "var(--surface-2)", borderRadius: 4, height: 8, overflow: "hidden" }}>
-      <div
-        style={{
-          width: `${value}%`,
-          height: "100%",
-          background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
-          borderRadius: 4,
-          transition: "width 0.6s ease",
-        }}
-      />
+    <div className="progress">
+      <div className="progress-fill" style={{ width: `${value}%` }} />
     </div>
   );
 }
 
 function SafetyNetBadge({ result }: { result?: VerificationRun }) {
   if (!result || result.status === "not_run") {
-    return <div className="card" style={{ color: "var(--muted)" }}>Safety Net: not run</div>;
+    return (
+      <div className="note">
+        <div className="note-title" style={{ color: "var(--muted)" }}>Safety net · not run</div>
+        <div className="note-body">No verification has been requested for this session yet.</div>
+      </div>
+    );
   }
   if (result.status === "not_available") {
-    return <div className="card" style={{ color: "var(--muted)" }}>Safety Net: not available · {result.summary}</div>;
+    return (
+      <div className="note">
+        <div className="note-title" style={{ color: "var(--muted)" }}>Safety net · not available</div>
+        <div className="note-body">{result.summary}</div>
+      </div>
+    );
   }
   if (result.status === "running") {
-    return <div className="card" style={{ color: "var(--muted)" }}>Safety Net: verification running</div>;
+    return (
+      <div className="note note-warn">
+        <div className="note-title" style={{ color: "var(--yellow)" }}>Safety net · running</div>
+        <div className="note-body">Verification is executing in an isolated container.</div>
+      </div>
+    );
   }
 
   const passing = result.passed;
   const failing = result.failed;
   const total = result.total;
   const allPass = result.status === "passed" && total > 0 && passing === total;
-  const resultColor = allPass ? "var(--green)" : failing > 0 ? "var(--red)" : "var(--muted)";
+  const tone = allPass ? "note-ok" : failing > 0 ? "note-danger" : "";
+  const color = allPass ? "var(--green)" : failing > 0 ? "var(--red)" : "var(--muted)";
+
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "14px 18px",
-        background: allPass ? "#23863622" : failing > 0 ? "var(--red-dim)" : "var(--surface-2)",
-        border: `1px solid ${allPass ? "#23863655" : failing > 0 ? "#da363355" : "var(--border)"}`,
-        borderRadius: "var(--radius)",
-      }}
-    >
-      <span style={{ fontSize: 24, color: resultColor }}>{allPass ? "✓" : failing > 0 ? "✗" : "—"}</span>
-      <div>
-        <div style={{ fontWeight: 700, color: resultColor, fontSize: 16 }}>
-          {allPass ? `Safety Net passed: ${passing}/${total}` : failing > 0 ? `Safety Net failed: ${failing} failed` : "Safety Net result inconclusive"}
-        </div>
-        <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
-          {result.summary} · {result.suite} · {result.duration}
+    <div className={`note ${tone}`}>
+      <div className="row" style={{ gap: 14, alignItems: "flex-start" }}>
+        <span style={{ fontSize: 22, lineHeight: 1.1, color }}>{allPass ? "✓" : failing > 0 ? "✕" : "—"}</span>
+        <div className="grow">
+          <div className="note-title" style={{ color }}>
+            {allPass ? `Safety net passing — ${passing} of ${total}`
+              : failing > 0 ? `Safety net failing — ${failing} test${failing === 1 ? "" : "s"}`
+              : "Safety net result inconclusive"}
+          </div>
+          <div className="note-body">{result.summary} · {result.suite} · {result.duration}</div>
         </div>
       </div>
     </div>
@@ -62,31 +63,25 @@ type StepMiniProps = { id: number; title: string; status: string; testsDelta?: s
 
 function StepMini({ id, title, status, testsDelta }: StepMiniProps) {
   const icons: Record<string, { symbol: string; color: string }> = {
-    passed: { symbol: "✓", color: "var(--green)" },
-    recovered: { symbol: "✓", color: "var(--green)" },
-    running: { symbol: "⟳", color: "var(--yellow)" },
-    failed: { symbol: "✗", color: "var(--red)" },
-    rolled_back: { symbol: "✗", color: "var(--red)" },
-    pending: { symbol: "○", color: "var(--muted)" },
+    passed:     { symbol: "✓", color: "var(--green)" },
+    recovered:  { symbol: "✓", color: "var(--green)" },
+    running:    { symbol: "•", color: "var(--yellow)" },
+    failed:     { symbol: "✕", color: "var(--red)" },
+    rolled_back:{ symbol: "↺", color: "var(--yellow)" },
+    pending:    { symbol: "○", color: "var(--muted)" },
   };
   const icon = icons[status] ?? { symbol: "○", color: "var(--muted)" };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "8px 0",
-        borderBottom: "1px solid var(--border)",
-        opacity: status === "pending" ? 0.55 : 1,
-      }}
-    >
-      <span style={{ color: icon.color, fontSize: 14, width: 16, textAlign: "center", flexShrink: 0 }}>
+    <div className="list-row" style={{ opacity: status === "pending" ? 0.6 : 1 }}>
+      <span style={{ color: icon.color, width: 16, textAlign: "center", flexShrink: 0, fontWeight: 700 }}>
         {icon.symbol}
       </span>
-      <span style={{ flex: 1, color: status === "running" ? "var(--yellow)" : "var(--text)" }}>
-        Step {id} — {title}
+      <span className="grow" style={{ color: status === "running" ? "var(--yellow)" : "var(--text)" }}>
+        <span className="tnum" style={{ color: "var(--muted)", marginRight: 10, fontFamily: "var(--mono)", fontSize: 11 }}>
+          {String(id).padStart(2, "0")}
+        </span>
+        {title}
       </span>
       {testsDelta && (
         <span className="mono" style={{ color: status === "passed" ? "var(--green)" : "var(--muted)" }}>
@@ -105,78 +100,70 @@ export default function OverviewScreen({ repoUrl }: { repoUrl?: string | null })
   const executing = plan.find((s) => s.status === "running");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Header */}
-      <div>
-        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Project Overview</h2>
-        <p style={{ color: "var(--muted)" }}>
-          Live status of the Legacy Code Whisperer modernization session
-        </p>
+    <div className="stack stack-28">
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">Project overview</h1>
+          <p className="page-sub">Live status of this Legacy Code Whisperer modernization session.</p>
+        </div>
+        <span className="status status-muted">{repository.language}</span>
       </div>
 
-      {/* Safety net — hero */}
       <SafetyNetBadge result={state.checkpointResult} />
 
-      {/* Repo + Progress row */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(300px, 1fr) minmax(260px, 1fr)", gap: 16 }}>
-        {/* Repo card */}
+      <div className="cols-2">
+        {/* Repository */}
         <div className="card">
-          <div className="section-title">Legacy Repository</div>
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{repository.name}</div>
+          <div className="section-title">Legacy repository</div>
+          <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.015em" }}>{repository.name}</div>
           {(repoUrl ?? repository.url) && (
-            <div className="mono" style={{ fontSize: 11, color: "var(--accent)", marginBottom: 10, wordBreak: "break-all" }}>
+            <div className="mono" style={{ color: "var(--accent)", marginTop: 5, overflowWrap: "anywhere" }}>
               {repoUrl ?? repository.url}
             </div>
           )}
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            {[
-              ["Runtime",       repository.runtime],
-              ["Framework",     repository.framework],
-              ["Language",      repository.language],
-              ["Last Commit",   repository.lastCommit],
-              ["Files",         repository.files.toString()],
-              ["Lines of Code", repository.linesOfCode.toLocaleString()],
-            ].map(([label, value]) => (
-              <tr key={label} style={{ borderBottom: "1px solid var(--border)" }}>
-                <td style={{ padding: "6px 0", color: "var(--muted)", width: "40%" }}>{label}</td>
-                <td style={{ padding: "6px 0", fontWeight: 500 }}>{value}</td>
-              </tr>
-            ))}
+          <table className="meta-table" style={{ marginTop: 16 }}>
+            <tbody>
+              {[
+                ["Runtime",       repository.runtime],
+                ["Framework",     repository.framework],
+                ["Language",      repository.language],
+                ["Last commit",   repository.lastCommit],
+                ["Files",         repository.files.toString()],
+                ["Lines of code", repository.linesOfCode.toLocaleString()],
+              ].map(([label, value]) => (
+                <tr key={label}>
+                  <td>{label}</td>
+                  <td style={{ fontWeight: 500 }} className="tnum">{value}</td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
 
-        {/* Progress card */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="section-title">Modernization Progress</div>
-          <div style={{ textAlign: "center", padding: "16px 0" }}>
-            <div style={{ fontSize: 52, fontWeight: 800, color: "var(--accent)", lineHeight: 1 }}>
-              {overallProgress}%
-            </div>
-            <div style={{ color: "var(--muted)", marginTop: 8 }}>
+        {/* Progress */}
+        <div className="card stack stack-16">
+          <div className="section-title" style={{ marginBottom: 0 }}>Modernization progress</div>
+          <div style={{ textAlign: "center", padding: "18px 0 6px" }}>
+            <div className="stat-value" style={{ fontSize: 56, letterSpacing: "-0.04em" }}>{overallProgress}%</div>
+            <div style={{ color: "var(--muted)", marginTop: 8, fontSize: 13 }}>
               {completed} of {plan.length} steps complete
             </div>
           </div>
           <ProgressBar value={overallProgress} />
           {executing && (
-            <div
-              style={{
-                padding: "10px 14px",
-                background: "#9e6a0322",
-                border: "1px solid #9e6a0355",
-                borderRadius: "var(--radius)",
-                fontSize: 13,
-              }}
-            >
-              <span style={{ color: "var(--yellow)", fontWeight: 600 }}>Now executing: </span>
-              {executing.title}
+            <div className="note note-warn" style={{ padding: "12px 15px" }}>
+              <div className="note-body" style={{ marginTop: 0 }}>
+                <strong style={{ color: "var(--yellow)" }}>Now executing — </strong>
+                {executing.title}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Plan mini */}
+      {/* Steps */}
       <div className="card">
-        <div className="section-title">Modernization Steps</div>
+        <div className="section-title">Modernization steps</div>
         {plan.map((s) => (
           <StepMini key={s.id} id={s.id} title={s.title} status={s.status} testsDelta={s.testsDelta} />
         ))}

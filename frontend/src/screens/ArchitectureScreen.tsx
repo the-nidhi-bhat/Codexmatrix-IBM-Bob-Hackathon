@@ -22,14 +22,18 @@ export default function ArchitectureScreen() {
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: "strict",
-          theme: "dark",
+          theme: "base",
           themeVariables: {
-            background: "#161b22",
-            primaryColor: "#21262d",
-            primaryTextColor: "#e6edf3",
-            primaryBorderColor: "#58a6ff",
-            lineColor: "#8b949e",
+            background: "#ffffff",
+            primaryColor: "#f4f2ec",
+            primaryTextColor: "#1b1a17",
+            primaryBorderColor: "#cfc9bd",
+            secondaryColor: "#e4f0ee",
+            tertiaryColor: "#faf9f6",
+            lineColor: "#8b857a",
+            textColor: "#1b1a17",
             fontSize: "13px",
+            fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif',
           },
         });
         return mermaid.render(id, diagram);
@@ -51,43 +55,48 @@ export default function ArchitectureScreen() {
   }, [architecture.available, diagram, rawId]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Architecture</h1>
-        <p style={{ color: "var(--muted)", fontSize: 13, margin: "6px 0 0" }}>
-          {repository.owner}/{repository.name} · {architecture.summary}
-        </p>
-        <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+    <div className="stack stack-20">
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">Architecture</h1>
+          <p className="page-sub">
+            {repository.owner}/{repository.name} — {architecture.summary}
+          </p>
+        </div>
+        <div className="row" style={{ gap: 7, flexWrap: "wrap" }}>
           <span className="tag tag-low">{repository.language}</span>
           <span className="tag tag-low">{repository.framework}</span>
-          <span className="tag tag-medium">{repository.runtime}</span>
-          <span className="tag tag-low">{repository.files} source files · {repository.linesOfCode.toLocaleString()} LOC</span>
+          <span className="tag tag-accent">{repository.runtime}</span>
+          <span className="tag">{repository.files} files · {repository.linesOfCode.toLocaleString()} LOC</span>
         </div>
       </div>
 
-      <div className="card" style={{ padding: 16 }}>
+      <div className="card">
         <div className="section-title">Repository component map</div>
         {!architecture.available ? (
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>Architecture unavailable: source structure was not sufficient to derive a component map.</div>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>
+            Architecture unavailable — the source structure was not sufficient to derive a component map.
+          </p>
         ) : error ? (
-          <div className="mono" style={{ color: "var(--red)", fontSize: 12 }}>Diagram could not be rendered: {error}</div>
+          <p className="mono" style={{ color: "var(--red)", fontSize: 12 }}>Diagram could not be rendered: {error}</p>
         ) : (
-          <div ref={hostRef} data-testid="architecture-diagram" />
+          <div ref={hostRef} data-testid="architecture-diagram" style={{ overflowX: "auto" }} />
         )}
-        <div style={{ color: "var(--muted)", fontSize: 11, marginTop: 12 }}>
-          Components come from detected source directories. Diagram connections represent repository containment, not inferred runtime dependencies.
-        </div>
+        <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 16, lineHeight: 1.6 }}>
+          Components come from detected source directories. Connections represent repository
+          containment, not inferred runtime dependencies.
+        </p>
       </div>
 
-      <div className="card" style={{ padding: 16 }}>
+      <div className="card">
         <div className="section-title">Detected project structure</div>
         {repository.projectStructure.length === 0 ? (
-          <div style={{ color: "var(--muted)", fontSize: 13 }}>Project structure not detected.</div>
+          <p style={{ color: "var(--muted)", fontSize: 13 }}>Project structure not detected.</p>
         ) : repository.projectStructure.map((entry) => (
-          <div key={entry.path} style={{ display: "flex", gap: 12, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-            <span className="mono" style={{ color: "var(--accent)", minWidth: 200 }}>{entry.path}</span>
-            <span style={{ color: "var(--muted)", fontSize: 12 }}>
-              {entry.kind === "directory" ? `${entry.files} source files` : "project manifest or documentation"}
+          <div key={entry.path} className="list-row" style={{ alignItems: "baseline" }}>
+            <span className="mono grow" style={{ color: "var(--accent)" }}>{entry.path}</span>
+            <span style={{ color: "var(--muted)", fontSize: 12.5, textAlign: "right" }}>
+              {entry.kind === "directory" ? `${entry.files} source files` : "manifest or documentation"}
             </span>
           </div>
         ))}
