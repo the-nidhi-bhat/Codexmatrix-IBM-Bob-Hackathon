@@ -11,7 +11,7 @@ Legacy Code Whisperer explores a safety-first way to modernize an inherited appl
 | --- | --- |
 | **Live Demo** | [Open the deployed application](https://legacy-code-whisperer-8k1b2hjp9-thenidhibhat-6721s-projects.vercel.app/) |
 | **Presentation** | [Download the presentation (PDF)](https://github.com/the-nidhi-bhat/Codexmatrix-IBM-Bob-Hackathon/releases/download/submission-resources/Legacy_Code_Whisperer.pdf) |
-| **Demo Video** | Public hosting link pending upload. |
+| **Demo Video** | [Watch the live demo](https://drive.google.com/file/d/1_pX7gnrzWi9VYwKosDne40eMx5sSxECd/view?usp=drive_link) |
 | **Source Code** | [GitHub repository](https://github.com/the-nidhi-bhat/Codexmatrix-IBM-Bob-Hackathon) |
 
 > The analysis API can inspect a public GitHub repository. The current modernization catalogue and checkpoint engine are purpose-built for the Get24 application included in this repository; analysis of an arbitrary URL does not make that URL the executor's target.
