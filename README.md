@@ -51,6 +51,26 @@ The API binds to loopback. Run state is held in memory for the life of the backe
 - **Execution and recovery:** Git worktrees, allowlisted transformations, Docker-based legacy validation, and `git revert`.
 - **Legacy demonstration target:** Get24, with its original Node.js, Express, Socket.IO, and KineticJS dependencies preserved in the imported application. See the original dependency declarations in [package.json](package.json) and its [archived dependency snapshot](legacy/get24-baseline/repro/LEGACY_NPM_LS.txt).
 
+## Run locally
+
+Use two terminals from the repository root. The backend listens on `127.0.0.1:3001`; Vite serves the interface on `http://localhost:5173` and proxies `/api` requests to the backend.
+
+```powershell
+# Terminal 1
+cd backend
+npm ci
+npm run dev
+```
+
+```powershell
+# Terminal 2
+cd frontend
+npm ci
+npm run dev
+```
+
+Repository analysis needs access to the public GitHub repository entered in the UI. Checkpoint verification needs Docker for the legacy Node.js runtime.
+
 ## Verification
 
 The repository includes backend tests for API trust boundaries, checkpoint flow, executor lifecycle and safety, integration wiring, reference validation, static security checks, and validation tooling. It also includes a frontend checkpoint contract test, checkpoint refusal tests, and the legacy behavioral test suite.
@@ -92,6 +112,10 @@ There are no Bob screenshots, transcripts, or exported sessions in this reposito
 - Validation and recovery tools: [validation/README.md](validation/README.md)
 
 Presentation and video references mentioned in historical materials are maintained outside this repository and are not presented here as included submission files.
+
+## Deployment
+
+This repository contains no deployment configuration. The API binds to loopback, and checkpoint verification depends on local Git worktrees and Docker, so the documented workflow runs locally.
 
 ## License
 
