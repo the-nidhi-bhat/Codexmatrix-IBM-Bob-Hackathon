@@ -15,6 +15,8 @@ Repository entry → Analysis → Risk and plan → Modernization → Checkpoint
 
 The backend accepts a public GitHub repository URL, analyzes a bounded local clone, and creates a server-owned run reference. Modernization choices come from an allowlisted operation catalogue. The executor works in an isolated Git worktree; checkpoint verification checks the selected commit against the legacy behavioral suite, and recovery uses a Git revert followed by verification. The React interface presents the workflow and its results.
 
+For the checked-out project, modernization runs use `main` as the read-only base and apply changes on server-owned run branches.
+
 ## What is implemented
 
 - Repository analysis for dependencies, entry points, runtime/framework signals, and file-level findings, with limits and path/symlink protections.

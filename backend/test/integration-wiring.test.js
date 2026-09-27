@@ -245,6 +245,7 @@ test("BUG 1+2: the checkpoint verifies the commit the executor created, on the r
   }
 
   await withServer(async (base) => {
+    const originalBranch = await git(["rev-parse", "--abbrev-ref", "HEAD"]);
     const run = seedRun();
 
     // ── execute ────────────────────────────────────────────────────────────
@@ -271,7 +272,7 @@ test("BUG 1+2: the checkpoint verifies the commit the executor created, on the r
 
     // The executor's own invariants still hold through the HTTP layer.
     assert.equal(branchExists(execution.runRef), true);
-    assert.equal(await git(["rev-parse", "--abbrev-ref", "HEAD"]), "integration/final");
+    assert.equal(await git(["rev-parse", "--abbrev-ref", "HEAD"]), originalBranch);
     assertOnlyMainWorktree("the apply worktree must be cleaned up");
     assert.ok(!isUnderTmp(REPO_ROOT), "sanity: the repo itself is not under tmp");
 
@@ -305,7 +306,7 @@ test("BUG 1+2: the checkpoint verifies the commit the executor created, on the r
     );
     assert.equal(await git(["rev-parse", `${execution.runRef}~1`]), execution.startingCommit,
       "and the executor's startingCommit is the base it branched from");
-    // BUG 2: the engine saw the run branch, not the integration tip.
+    // BUG 2: the engine saw the run branch, not the primary tip.
     assert.equal(view.checkpoint.branch, execution.runRef);
 
     // The real 18 tests actually ran. Counts are the engine's, never ours.
@@ -349,6 +350,7 @@ test("BUG 2, proven by recovery: a reverted subject lands on the run branch as a
   }
 
   await withServer(async (base) => {
+    const mainCommit = await git(["rev-parse", "main"]);
     // A deliberately broken win condition: the commit exists, the tests fail,
     // and the engine must revert it and re-validate. Reverting needs a branch to
     // land on — a detached HEAD would make the revert unreachable.
@@ -390,8 +392,8 @@ test("BUG 2, proven by recovery: a reverted subject lands on the run branch as a
     assert.equal(rollback.revertCommit, await git(["rev-parse", runRef]));
     assert.equal(await git(["rev-parse", `${runRef}~1`]), modernizationCommit);
     assert.equal(await git(["rev-parse", `${runRef}~2`]), startingCommit);
-    assert.equal(await git(["rev-parse", "integration/final"]), startingCommit,
-      "the integration branch must be exactly where it was");
+    assert.equal(await git(["rev-parse", "main"]), mainCommit,
+      "the primary branch must be exactly where it was");
     assertOnlyMainWorktree("the recovery worktree must be cleaned up");
 
     // The run branch deliberately SURVIVES a completed run: it is the record a
@@ -428,7 +430,7 @@ test("verify refuses a run with no recorded subject, and names the reason", asyn
 test("a subject without a run ref is refused rather than anchored on a guess", async () => {
   await withServer(async (base) => {
     // The exact shape the M3.3 audit found: a commit exists, no run branch. The
-    // runner would have defaulted the anchor to integration/final, which is both
+    // runner would have defaulted the anchor to main, which is both
     // the wrong anchor and a detached checkout.
     const run = seedRun({
       execution: {

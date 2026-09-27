@@ -18,7 +18,7 @@
  *     anchor change: a detached worktree throws away the engine's `git revert`
  *     when the worktree goes.
  *  2. The legacy no-ref path still works: a baseline subject with no ref is
- *     verified in a DETACHED worktree anchored on integration/final.
+ *     verified in a DETACHED worktree anchored on main.
  *  3. Rollback persistence. A commit that breaks the suite is executed, the
  *     engine fails validation, `tools/rollback.js` reverts it, and recovery
  *     validation passes. "The revert command executed" is explicitly NOT
@@ -37,7 +37,7 @@ const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
 
 const { runCheckpoint } = require("../dist/checkpointRunner");
-const { executeModernization, INTEGRATION_BRANCH } = require("../dist/modernization/executor");
+const { executeModernization, BASE_BRANCH } = require("../dist/modernization/executor");
 const {
   REPO_ROOT,
   dockerAvailable,
@@ -84,7 +84,7 @@ test("F-12: a modernization commit is verified through an ATTACHED worktree", { 
   assert.equal(execution.status, "completed", JSON.stringify(execution));
   assert.equal(execution.code, undefined);
   assert.equal(execution.cleanup.removed, true, "the execute worktree must be gone");
-  assert.equal(execution.baseCommit, shaOf(INTEGRATION_BRANCH), "runs are based on integration/final");
+  assert.equal(execution.baseCommit, shaOf(BASE_BRANCH), "runs are based on main");
   assert.deepEqual(execution.changedFiles.sort(), ["package.json", "server/game/index.js"]);
 
   // The commit is real and on the branch, and the branch is what a successful
@@ -136,16 +136,16 @@ test("F-12: a modernization commit is verified through an ATTACHED worktree", { 
   assert.equal(isRegisteredWorktree(run.worktreePath), false, "the checkpoint worktree must be removed");
   assert.equal(run.cleanup.removed, true, run.cleanup.warning || "");
   assert.equal(shaOf(branch), commit, "verification must not move the branch");
-  assert.equal(shaOf(INTEGRATION_BRANCH), execution.baseCommit, "verification must not move integration/final");
+  assert.equal(shaOf(BASE_BRANCH), execution.baseCommit, "verification must not move main");
 });
 
 test("the legacy no-ref path verifies a baseline subject in a DETACHED worktree", { timeout: FLOW_TIMEOUT_MS }, async (t) => {
   if (!docker.ok) return t.skip(`Docker unavailable: ${dockerReason}`);
 
   // No ref: the pre-M3.3 call shape, which must keep working. A baseline subject
-  // is contained in integration/final, so no run branch is needed and none is
+  // is contained in main, so no run branch is needed and none is
   // created — nothing may leak for this path.
-  const commit = shaOf(INTEGRATION_BRANCH);
+  const commit = shaOf(BASE_BRANCH);
   const before = git(["for-each-ref", "--format=%(refname)", "refs/heads/lcw/modernization/"]);
 
   const watcher = watchTmpWorktrees(150);
@@ -159,7 +159,7 @@ test("the legacy no-ref path verifies a baseline subject in a DETACHED worktree"
 
   assert.equal(run.outcome, "COMPLETED", JSON.stringify({ ...run, stdout: run.stdout.slice(-2000) }));
   assert.equal(run.checkpointStatus, "VERIFIED");
-  assert.equal(run.anchorRef, INTEGRATION_BRANCH, "no ref must default to integration/final");
+  assert.equal(run.anchorRef, BASE_BRANCH, "no ref must default to main");
   assert.equal(run.checkpoint.validationResult.failed, 0);
 
   const mine = observed.find((w) => normalizeFsPath(w.path) === normalizeFsPath(run.worktreePath));
@@ -174,7 +174,7 @@ test("the legacy no-ref path verifies a baseline subject in a DETACHED worktree"
     before,
     "the no-ref path must not create a branch",
   );
-  assert.equal(shaOf(INTEGRATION_BRANCH), commit, "the no-ref path must not move the anchor");
+  assert.equal(shaOf(BASE_BRANCH), commit, "the no-ref path must not move the anchor");
 });
 
 test("rollback persists as a commit on the run branch, and restores the change", { timeout: FLOW_TIMEOUT_MS }, async (t) => {

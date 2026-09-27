@@ -290,7 +290,7 @@ test("the routers expose no rollback or abort endpoint yet", () => {
 test("the verify route forwards a ref, but only one it resolved from the server's own run record", async () => {
   // This assertion was inverted by the integration milestone, and deliberately.
   // Passing no ref was not a safety property — it made the runner default the
-  // anchor to the integration branch and check out DETACHED, which cannot verify
+  // anchor to the primary branch and check out DETACHED, which cannot verify
   // a modernization commit (it is a child of the tip) and loses the revert. So the
   // route now passes a ref, and the property worth holding is WHERE it came
   // from: `subject.ref`, out of the server-owned run record, validated against the

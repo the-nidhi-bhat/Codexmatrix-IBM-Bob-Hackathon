@@ -39,15 +39,15 @@
 //  Ancestry is checked against a NAMED, server-owned ref, never against the
 //  ambient HEAD. That distinction is the whole point of this file's contract:
 //
-//    default  anchor = integration/final, checkout detached at the commit.
+//    default  anchor = main, checkout detached at the commit.
 //             Correct for a baseline subject: a commit in the controlled
 //             integration history. Anchor is a name, so the answer does not
 //             change because someone checked out a different branch.
 //
 //    run ref  anchor = lcw/modernization/<uuid>, checkout ATTACHED to it.
 //             Correct for a modernization subject: the executor's commit is a
-//             CHILD of integration/final, so it is genuinely not an ancestor
-//             of the integration tip, and anchoring on the tip refused a
+//             CHILD of main, so it is genuinely not an ancestor
+//             of the primary tip, and anchoring on the tip refused a
 //             perfectly legitimate run. Anchoring on the branch that holds it
 //             is both true and narrower — the commit must be inside that
 //             specific run branch. Attaching, rather than detaching, is what
@@ -66,7 +66,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { v4 as uuidv4 } from "uuid";
-import { INTEGRATION_BRANCH, RUN_BRANCH } from "./modernization/executor";
+import { BASE_BRANCH, RUN_BRANCH } from "./modernization/executor";
 
 const execFileAsync = promisify(execFile);
 
@@ -115,7 +115,7 @@ export interface CheckpointRunResult {
   /** The commit that was verified, echoed back for the audit trail. */
   commit: string;
   /** The named, server-owned ref the commit was required to be contained in:
-   *  integration/final, or the run branch the executor created. Never "HEAD". */
+   *  main, or the run branch the executor created. Never "HEAD". */
   anchorRef: string;
   repositoryRoot: string;
   worktreePath: string;
@@ -144,7 +144,7 @@ export interface RunCheckpointOptions {
    * Optional server-owned anchor. Omit it for a baseline subject that lives in
    * the controlled integration history. Pass the executor's
    * lcw/modernization/<uuid> branch for a modernization subject — that commit
-   * is a child of the integration tip, so it is not an ancestor of it.
+   * is a child of the primary tip, so it is not an ancestor of it.
    *
    * Server-controlled, never client text: a value that does not match the
    * executor's run-branch pattern is refused before any git command runs.
@@ -290,7 +290,7 @@ export async function runCheckpoint(options: RunCheckpointOptions): Promise<Chec
       error: {
         code: "INVALID_REF",
         message:
-          "The anchor ref must be a string. Omit it to anchor on " + INTEGRATION_BRANCH +
+          "The anchor ref must be a string. Omit it to anchor on " + BASE_BRANCH +
           ", or pass a server-owned lcw/modernization/<uuid> branch name.",
       },
     });
@@ -302,11 +302,11 @@ export async function runCheckpoint(options: RunCheckpointOptions): Promise<Chec
         code: "UNTRUSTED_REF",
         message:
           `Ref ${requestedRef} is not a server-owned modernization run branch. ` +
-          `Only ${INTEGRATION_BRANCH} (by default) and lcw/modernization/<uuid> are trusted as anchors.`,
+          `Only ${BASE_BRANCH} (by default) and lcw/modernization/<uuid> are trusted as anchors.`,
       },
     });
   }
-  const anchorRef = requestedRef === "" ? INTEGRATION_BRANCH : requestedRef;
+  const anchorRef = requestedRef === "" ? BASE_BRANCH : requestedRef;
   result.anchorRef = anchorRef;
 
   let root: string;

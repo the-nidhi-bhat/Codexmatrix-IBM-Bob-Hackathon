@@ -28,9 +28,8 @@
 //  generated. The UUID is validated before it is used, so it cannot carry a
 //  path separator, a flag or a shell metacharacter into a branch name.
 //
-//  Base: the server-resolved tip of the integration branch. integration/final
-//  is never checked out, moved, reset or committed to by anything here; the
-//  executor only ever reads it.
+//  Base: the server-resolved tip of the primary branch. main is never checked
+//  out, moved, reset or committed to by anything here; the executor only reads it.
 //
 //  All-or-nothing: the whole operation is planned in memory first
 //  (planOperation, M3.1) and refused if any edit cannot be applied exactly
@@ -61,7 +60,7 @@ const execFileAsync = promisify(execFile);
  * The branch a modernization run is based on. Read-only for this module: it is
  * resolved to a commit and used as a base, never checked out or moved.
  */
-export const INTEGRATION_BRANCH = "integration/final";
+export const BASE_BRANCH = "main";
 
 /** One definition of a run id, shared with the checkpoint runner. */
 const RUN_ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -111,7 +110,7 @@ export interface ModernizationExecutionResult {
   startingCommit: string | null;
   /** The commit this executor created. */
   modernizationCommit: string | null;
-  /** The resolved integration tip the run branch was based on. */
+  /** The resolved primary-branch tip the run branch was based on. */
   baseCommit: string | null;
   /** lcw/modernization/<runId>, left in place for the verify/rollback stages. */
   branch: string | null;
@@ -186,17 +185,17 @@ function safeJoin(root: string, relative: string): string | null {
   return isInside(full, path.resolve(root)) ? full : null;
 }
 
-/** The integration tip, preferring the local branch and falling back to the
+/** The primary-branch tip, preferring the local branch and falling back to the
  *  remote-tracking ref so a fresh clone still works. Read-only. */
 async function resolveBaseCommit(root: string): Promise<string> {
-  for (const ref of [INTEGRATION_BRANCH, `origin/${INTEGRATION_BRANCH}`]) {
+  for (const ref of [BASE_BRANCH, `origin/${BASE_BRANCH}`]) {
     try {
       return await git(root, ["rev-parse", "--verify", `${ref}^{commit}`]);
     } catch {
       /* try the next ref */
     }
   }
-  throw new Error(`cannot resolve ${INTEGRATION_BRANCH}`);
+  throw new Error(`cannot resolve ${BASE_BRANCH}`);
 }
 
 async function removeWorktree(root: string, worktreePath: string): Promise<ModernizationExecutionResult["cleanup"]> {
@@ -355,7 +354,7 @@ export async function executeOperationInWorktree(
   const createdBranch = !branchExists;
 
   try {
-    // -b creates the run branch at the integration tip; without -b an existing
+    // -b creates the run branch at the primary tip; without -b an existing
     // run branch is reused. Either way the checkout is the only writable copy.
     await git(root, [
       "worktree",

@@ -28,7 +28,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { runCheckpoint } = require("../dist/checkpointRunner");
-const { INTEGRATION_BRANCH } = require("../dist/modernization/executor");
+const { BASE_BRANCH } = require("../dist/modernization/executor");
 const { REPO_ROOT, git } = require("./helpers");
 
 // A well-formed 40-hex SHA that does not exist. Reaching COMMIT_NOT_FOUND
@@ -38,7 +38,7 @@ const ABSENT_SHA = "0".repeat(40);
 const ABSENT_RUN_BRANCH = "lcw/modernization/00000000-0000-4000-8000-000000000000";
 // A commit that definitely exists, for the cases that must get past the commit
 // gate to reach the ref gate.
-const REAL_SHA = git(["rev-parse", "integration/final^{commit}"]);
+const REAL_SHA = git(["rev-parse", "main^{commit}"]);
 
 /** Assert a result is a structured refusal and that no git command ran. */
 function assertRefusedWithoutGit(result, code) {
@@ -66,7 +66,7 @@ test("a valid-format but absent SHA is refused as COMMIT_NOT_FOUND, not as a sha
   assert.equal(result.error.code, "COMMIT_NOT_FOUND");
   // This one DID reach git, which is the point: the shape was acceptable, so
   // the runner resolved the root and asked git about the commit.
-  assert.equal(result.anchorRef, INTEGRATION_BRANCH);
+  assert.equal(result.anchorRef, BASE_BRANCH);
   assert.equal(result.repositoryRoot, REPO_ROOT);
   assert.equal(result.worktreeCreated, false, "an absent commit must not reach a worktree");
   assert.equal(result.checkpointStatus, null, "no engine run may start for an absent commit");
@@ -132,7 +132,7 @@ test("Finding 1: a non-string commit is refused as INVALID_COMMIT_SHA, never a T
   }
 });
 
-test("an absent ref keeps its legacy meaning: anchor on integration/final", async (t) => {
+test("an absent ref defaults to the primary branch main", async (t) => {
   // undefined, null, and the empty/whitespace string all mean "no ref", which
   // is the pre-M3.3 behaviour and must not change. Reaching COMMIT_NOT_FOUND
   // rather than UNTRUSTED_REF proves the default anchor was selected and the
@@ -148,7 +148,7 @@ test("an absent ref keeps its legacy meaning: anchor on integration/final", asyn
     await t.test(label, async () => {
       const result = await runCheckpoint({ commit: ABSENT_SHA, ref });
       assert.equal(result.error.code, "COMMIT_NOT_FOUND", "must not be refused as an untrusted ref");
-      assert.equal(result.anchorRef, INTEGRATION_BRANCH);
+      assert.equal(result.anchorRef, BASE_BRANCH);
       assert.equal(result.repositoryRoot, REPO_ROOT);
     });
   }
@@ -156,7 +156,7 @@ test("an absent ref keeps its legacy meaning: anchor on integration/final", asyn
 
 test("a string ref outside the run-branch namespace is refused as UNTRUSTED_REF", async (t) => {
   const cases = {
-    "the default anchor, passed explicitly": INTEGRATION_BRANCH,
+    "the default anchor, passed explicitly": BASE_BRANCH,
     "main": "main",
     "HEAD": "HEAD",
     "a tag": "legacy-baseline",
@@ -233,7 +233,7 @@ test("a commit that is not 40 lowercase hex characters is refused, whatever else
     "41 characters": "a".repeat(41),
     "39 characters": "a".repeat(39),
     "the HEAD name": "HEAD",
-    "a branch name": INTEGRATION_BRANCH,
+    "a branch name": BASE_BRANCH,
     "a tag name": "legacy-baseline",
     "a range": "HEAD~1..HEAD",
     "a caret expression": "HEAD^{commit}",
@@ -277,7 +277,7 @@ test("a commit that exists but is reachable from no branch fails closed", async 
   // `git commit-tree` creates a real commit object and writes no ref, no branch
   // and no worktree change, so this is the exact "unreferenced commit" case: it
   // resolves, so COMMIT_NOT_FOUND cannot catch it, and it is not an ancestor of
-  // integration/final, so containment must.
+  // main, so containment must.
   const tree = git(["rev-parse", "HEAD^{tree}"]);
   const orphan = git([
     "-c", "user.name=M3.3 Test",
@@ -300,7 +300,7 @@ test("a commit that exists but is reachable from no branch fails closed", async 
 });
 
 test("a descendant of the anchor is accepted for containment, so the checks above are not vacuous", async () => {
-  // The integration tip is by definition an ancestor of integration/final, so
+  // The primary tip is by definition an ancestor of main, so
   // the containment gate must let it through. That is proved by contrast: the
   // same commit, anchored on a ref that does not exist, fails at the REF gate,
   // which is only reachable because containment was not the blocker. The
@@ -320,7 +320,7 @@ test("a descendant of the anchor is accepted for containment, so the checks abov
   assert.equal(orphanResult.error.code, "COMMIT_NOT_ANCESTOR");
   assert.equal(orphanResult.repositoryRoot, REPO_ROOT, "the orphan must have reached git");
 
-  // REAL_SHA is contained in integration/final, so it cannot produce
+  // REAL_SHA is contained in main, so it cannot produce
   // COMMIT_NOT_ANCESTOR. Only the missing anchor can stop it.
   const containedUnderMissingAnchor = await runCheckpoint({ commit: REAL_SHA, ref: ABSENT_RUN_BRANCH });
   assert.equal(containedUnderMissingAnchor.error.code, "REF_NOT_FOUND");

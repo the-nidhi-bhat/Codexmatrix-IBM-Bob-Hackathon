@@ -22,7 +22,7 @@
 //  reads it back as an instruction.
 //
 //  One execution at a time, mirroring the analyze route: two concurrent runs
-//  would both branch from the same integration tip, and the second would race
+//  would both branch from the same primary tip, and the second would race
 //  the first's base. ponytail: one boolean, no queue.
 // ─────────────────────────────────────────────────────────────────────────────
 

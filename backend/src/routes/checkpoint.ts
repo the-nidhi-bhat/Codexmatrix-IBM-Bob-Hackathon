@@ -112,8 +112,8 @@ class SubjectNotResolvable extends Error {
  * a subject.
  *
  * Why the ref is required rather than defaulted: a modernization commit is a
- * CHILD of the integration tip, so it is genuinely not an ancestor of
- * `integration/final`. Defaulting the anchor to the integration branch would
+ * CHILD of the primary tip, so it is genuinely not an ancestor of
+ * `main`. Defaulting the anchor to the primary branch would
  * refuse every legitimate run; worse, it would verify against the wrong anchor.
  * Anchoring on the run branch is both true and narrower — the commit must be
  * inside the branch the server itself created. Attaching the worktree to that

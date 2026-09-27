@@ -28,7 +28,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { INTEGRATION_BRANCH, executeOperationInWorktree } = require("../dist/modernization/executor");
+const { BASE_BRANCH, executeOperationInWorktree } = require("../dist/modernization/executor");
 const {
   REPO_ROOT,
   branchExists,
@@ -171,7 +171,7 @@ test("a branch that already existed is never removed, even on a refusal", async 
   // the executor did not need, and did not use, a force delete.
   const runId = randomUUID();
   const branch = `lcw/modernization/${runId}`;
-  const base = shaOf(INTEGRATION_BRANCH);
+  const base = shaOf(BASE_BRANCH);
   git(["branch", branch, base]);
   assert.equal(branchExists(branch), true, "precondition: the branch exists");
 
@@ -230,17 +230,17 @@ test("a failed worktree add cleans up the branch git had already created", async
   assert.equal(gitAttempt(["worktree", "prune"]).ok, true, "no worktree registration may survive");
 });
 
-test("the branch is created at the integration tip, never from ambient HEAD", async () => {
+test("the branch is created at the primary tip, never from ambient HEAD", async () => {
   // `resolveBaseCommit` is what makes a run reproducible: a run made while some
-  // other branch is checked out must still be based on integration/final. The
+  // other branch is checked out must still be based on main. The
   // base is also asserted on the success path in checkpoint-flow.test.js; this
   // states it where the refusal path cannot hide a regression behind a commit.
   const runId = randomUUID();
   const branch = `lcw/modernization/${runId}`;
   const result = await executeOperationInWorktree(REPO_ROOT, noEffectOperation(), runId);
 
-  assert.equal(result.baseCommit, shaOf(INTEGRATION_BRANCH));
-  assert.equal(result.startingCommit, shaOf(INTEGRATION_BRANCH));
+  assert.equal(result.baseCommit, shaOf(BASE_BRANCH));
+  assert.equal(result.startingCommit, shaOf(BASE_BRANCH));
   assert.equal(branchExists(branch), false, "the refused run's branch must be gone");
 
   // And the refusal happened after the base was resolved, which is what makes
