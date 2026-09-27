@@ -9,6 +9,7 @@ import VerificationScreen from "./screens/VerificationScreen";
 import RollbackScreen from "./screens/RollbackScreen";
 import ReportScreen from "./screens/ReportScreen";
 import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
+import { useModernization } from "./workflow/useModernization";
 import type { WorkflowState } from "./workflow/types";
 import { analyzeRepository, WorkflowApiError } from "./api/workflowApi";
 import "./App.css";
@@ -46,10 +47,25 @@ const PHASE_LABELS: Record<Screen, string> = {
 // ── Dashboard (rendered inside WorkflowProvider) ─────────────────────────────
 
 function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: () => void }) {
-  const { state } = useWorkflow();
+  const ctx = useWorkflow();
+  const { state } = ctx;
   const { repository, overallProgress } = state;
 
   const [active, setActive] = useState<Screen>("overview");
+
+  // One controller owns the Execute/Verify lifecycle for the whole dashboard, so
+  // the header badge, the Execution screen and the Verification screen all read
+  // the same request state and cannot disagree about it.
+  const controller = useModernization(ctx);
+
+  // The header badge reports the engine's own state, verbatim.
+  const safetyNet = controller.view?.checkpointStatus ?? null;
+  const safetyNetColor =
+    safetyNet === "VERIFIED" || safetyNet === "RECOVERY_VERIFIED"
+      ? "var(--green)"
+      : safetyNet
+        ? "var(--red)"
+        : "var(--muted)";
 
   function navigate(screen: Screen) {
     setActive(screen);
@@ -112,10 +128,14 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
             }}
           >
             <span style={{ color: "var(--muted)", fontSize: 10 }}>●</span>
-            <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600 }}>
-              {state.checkpointResult && state.checkpointResult.tests.length > 0
-                ? "Safety Net result received"
-                : "Safety Net: not run"}
+            <span style={{ color: safetyNetColor, fontSize: 12, fontWeight: 600 }}>
+              {controller.verify.phase === "busy"
+                ? "Safety Net: running…"
+                : safetyNet
+                  ? `Safety Net: ${safetyNet}`
+                  : controller.pendingRef
+                    ? "Safety Net: not run — commit awaiting checkpoint"
+                    : "Safety Net: not run"}
             </span>
           </div>
           {/* Change repo */}
@@ -221,12 +241,15 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
           {active === "plan"         && <PlanScreen />}
           {active === "execution"    && (
             <ExecutionScreen
+              controller={controller}
               onVerify={() => navigate("verification")}
               onRollback={() => navigate("rollback")}
             />
           )}
-          {active === "verification" && <VerificationScreen onRollback={() => navigate("rollback")} />}
-          {active === "rollback"     && <RollbackScreen />}
+          {active === "verification" && (
+            <VerificationScreen controller={controller} onRollback={() => navigate("rollback")} />
+          )}
+          {active === "rollback"     && <RollbackScreen controller={controller} />}
           {active === "report"       && <ReportScreen />}
         </main>
       </div>
@@ -290,7 +313,14 @@ export default function App() {
 
   // phase.kind === "dashboard"
   return (
-    <WorkflowProvider state={phase.workflowState}>
+    <WorkflowProvider
+      state={phase.workflowState}
+      onStateChange={(workflowState) => {
+        // Adopt the server's newer record of the same run. The runId and repo
+        // are unchanged by Execute, so the phase object is preserved as-is.
+        setPhase((prev) => (prev.kind === "dashboard" ? { ...prev, workflowState } : prev));
+      }}
+    >
       <Dashboard repoUrl={phase.repoUrl} onChangeRepo={() => {
         requestController.current?.abort();
         requestController.current = null;

@@ -85,8 +85,17 @@ export interface ExecutionState {
   status: "not_available" | "running" | "complete" | "failed";
   log: ActivityLogEntry[];
   filesChanged: FileChange[];
+  /** HEAD of the execute worktree before the operation was applied. Written by
+   *  the execute stage only. Not the commit under test. */
   startingCommit?: string;
+  /** The commit the execute stage created. THIS is the checkpoint subject. */
   modernizationCommit?: string;
+  /** The server-owned run branch that holds modernizationCommit:
+   *  lcw/modernization/<runId>. It is the anchor the checkpoint stage attaches
+   *  its worktree to, so a revert lands on a named branch. Never client-set. */
+  runRef?: string;
+  /** The catalogue id that was executed. */
+  operationId?: string;
 }
 
 export interface TestResult {

@@ -24,7 +24,9 @@
 import { Router, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { runCheckpoint } from "../checkpointRunner";
-import { getRun } from "./analyze";
+import { RUN_BRANCH } from "../modernization/executor";
+import { getRun } from "../runStore";
+import { readBody, requireText } from "../trust";
 import type {
   CheckpointRefusal,
   CheckpointRunStatus,
@@ -95,26 +97,54 @@ class SubjectNotResolvable extends Error {
 }
 
 /**
- * Resolve the approved checkpoint subject from the SERVER-owned run record.
+ * Resolve the checkpoint subject from the SERVER-owned run record.
  *
- * ponytail: `execution.startingCommit` is the same field tools/checkpoint.js
- * reports as "HEAD at the time validation was invoked" — the commit to verify.
- * Nothing writes it yet: the analyze phase never sets it, and the only other
- * commit in the record (`repository.currentCommit`) belongs to the throwaway
- * clone of the client's GitHub URL, not to the controlled repository, so it is
- * not a valid subject. Every verify is therefore refused until the execute phase
- * records the approved commit. The client still cannot choose it.
+ * Two things are required together, and both come from the record the execute
+ * stage wrote:
+ *
+ *   commit  execution.modernizationCommit — the commit the executor CREATED.
+ *   ref     execution.runRef — lcw/modernization/<runId>, the server-owned run
+ *           branch that holds it.
+ *
+ * Why not `startingCommit`: that is HEAD *before* the operation was applied, so
+ * verifying it would verify the pre-modernization tree and report VERIFIED for a
+ * change that was never checked. It is recorded for the audit trail, not used as
+ * a subject.
+ *
+ * Why the ref is required rather than defaulted: a modernization commit is a
+ * CHILD of the integration tip, so it is genuinely not an ancestor of
+ * `integration/final`. Defaulting the anchor to the integration branch would
+ * refuse every legitimate run; worse, it would verify against the wrong anchor.
+ * Anchoring on the run branch is both true and narrower — the commit must be
+ * inside the branch the server itself created. Attaching the worktree to that
+ * branch (instead of checking out detached) is also what lets the engine's own
+ * `git revert` land as a persistent commit instead of on a throwaway HEAD.
+ *
+ * If either piece is missing the run is refused, never guessed. A checkpoint
+ * with no trustworthy subject is worse than no checkpoint at all.
  */
-function resolveApprovedSubject(run: WorkflowState): string {
-  const candidate = run.execution?.startingCommit;
-  if (typeof candidate === "string" && COMMIT_SHA.test(candidate)) {
-    return candidate;
+function resolveTrustedSubject(run: WorkflowState): { commit: string; ref: string } {
+  const commit = run.execution?.modernizationCommit;
+  if (typeof commit !== "string" || !COMMIT_SHA.test(commit)) {
+    throw new SubjectNotResolvable({
+      code: "APPROVED_SUBJECT_NOT_RECORDED",
+      message:
+        "No approved modernization commit is recorded for this run, so no checkpoint subject could be resolved. Execute a modernization step first; the subject is resolved server-side and is never taken from the request.",
+    });
   }
-  throw new SubjectNotResolvable({
-    code: "APPROVED_SUBJECT_NOT_RECORDED",
-    message:
-      "No approved modernization commit is recorded for this run, so no checkpoint subject could be resolved. The subject is resolved server-side and is never taken from the request.",
-  });
+
+  const ref = run.execution?.runRef;
+  // The same RUN_BRANCH pattern the executor creates branches with, so a value
+  // that is not one of ours is refused before it reaches a git argument.
+  if (typeof ref !== "string" || !RUN_BRANCH.test(ref)) {
+    throw new SubjectNotResolvable({
+      code: "APPROVED_REF_NOT_RECORDED",
+      message:
+        "No server-owned run branch is recorded for this run, so the checkpoint has no anchor to verify against. A modernization commit is verified inside the run branch the server created for it.",
+    });
+  }
+
+  return { commit, ref };
 }
 
 function fail(res: Response, status: number, code: string, message: string): void {
@@ -140,32 +170,20 @@ function toView(run: StoredRun): CheckpointRunView {
 // ── POST /api/checkpoint-runs ─────────────────────────────────────────────────
 
 router.post("/checkpoint-runs", (req: Request, res: Response): void => {
-  const body: unknown = req.body;
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    fail(res, 400, "INVALID_BODY", "Send a JSON object with an analysisRunId.");
-    return;
-  }
-
-  const keys = Object.keys(body as Record<string, unknown>);
-  const unexpected = keys.filter((k) => !(CLIENT_FIELDS as readonly string[]).includes(k));
-  if (unexpected.length > 0) {
+  const body = readBody(req.body, CLIENT_FIELDS);
+  if (!body.ok) {
     // Names only, never values: a rejected field is not echoed back.
-    fail(
-      res,
-      400,
-      "UNEXPECTED_FIELD",
-      `This endpoint accepts only analysisRunId. Rejected: ${unexpected.join(", ")}.`
-    );
+    fail(res, body.status, body.code, body.message);
     return;
   }
 
-  const analysisRunId = (body as Record<string, unknown>).analysisRunId;
-  if (typeof analysisRunId !== "string" || analysisRunId.trim() === "") {
-    fail(res, 400, "MISSING_ANALYSIS_RUN_ID", "analysisRunId is required.");
+  const analysisRunId = requireText(body.value["analysisRunId"], "analysisRunId", "MISSING_ANALYSIS_RUN_ID");
+  if (!analysisRunId.ok) {
+    fail(res, 400, analysisRunId.code, analysisRunId.message);
     return;
   }
 
-  const analysisRun = getRun(analysisRunId.trim());
+  const analysisRun = getRun(analysisRunId.value);
   if (!analysisRun) {
     fail(res, 404, "ANALYSIS_RUN_NOT_FOUND", "No analysis run with that id exists on this server.");
     return;
@@ -243,10 +261,10 @@ router.post("/checkpoint-runs/:id/verify", async (req: Request, res: Response): 
       stored.status = "failed";
       stored.refusal = { ...errorOverride };
     } else {
-      const subject = resolveApprovedSubject(analysisRun);
-      stored.subjectCommit = subject.slice(0, 12);
+      const subject = resolveTrustedSubject(analysisRun);
+      stored.subjectCommit = subject.commit.slice(0, 12);
 
-      const result = await runCheckpoint({ commit: subject });
+      const result = await runCheckpoint({ commit: subject.commit, ref: subject.ref });
 
       // Server log keeps the paths and the tool output; the client gets neither.
       if (result.cleanup.warning) {

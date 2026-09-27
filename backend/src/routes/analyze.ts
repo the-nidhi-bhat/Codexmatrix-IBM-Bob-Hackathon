@@ -1,17 +1,9 @@
 import { Router, Request, Response } from "express";
 import { analyzeRepository, validateRepoUrl } from "../analyzer";
+import { getRun, putRun, runCount } from "../runStore";
 import type { WorkflowState, AnalyzeRequest } from "../types";
 
 const router = Router();
-
-// In-memory run store (replace with Redis/DB for production)
-const runs = new Map<string, WorkflowState>();
-
-/** Server-side lookup of a stored analysis run. Exported so other routers can
- *  resolve a run by id without a second store or a client-supplied value. */
-export function getRun(runId: string): WorkflowState | undefined {
-  return runs.get(runId);
-}
 
 // ponytail: one clone at a time. The analysis walk is synchronous, so a queue is
 // enough for a demo; use a job queue if this ever takes real traffic.
@@ -67,12 +59,7 @@ router.post("/analyze", async (req: Request, res: Response): Promise<void> => {
     const workflow = await analyzeRepository(repoUrl.trim(), branch);
 
     // Store run
-    runs.set(workflow.runId, workflow);
-    // Evict old runs (keep last 50)
-    if (runs.size > 50) {
-      const oldest = runs.keys().next().value;
-      if (oldest) runs.delete(oldest);
-    }
+    putRun(workflow);
 
     res.json({ success: true, runId: workflow.runId, workflow });
   } catch (err: unknown) {
@@ -95,7 +82,7 @@ router.post("/analyze", async (req: Request, res: Response): Promise<void> => {
 
 router.get("/runs/:runId", (req: Request, res: Response): void => {
   const runId = Array.isArray(req.params["runId"]) ? req.params["runId"][0] : req.params["runId"];
-  const workflow = runs.get(runId);
+  const workflow = getRun(runId);
   if (!workflow) {
     res.status(404).json({
       success: false,
@@ -109,7 +96,7 @@ router.get("/runs/:runId", (req: Request, res: Response): void => {
 // ── GET /api/health ───────────────────────────────────────────────────────────
 
 router.get("/health", (_req: Request, res: Response): void => {
-  res.json({ ok: true, runs: runs.size });
+  res.json({ ok: true, runs: runCount() });
 });
 
 export default router;

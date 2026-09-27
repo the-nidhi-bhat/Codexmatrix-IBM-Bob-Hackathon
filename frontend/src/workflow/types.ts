@@ -114,6 +114,85 @@ export interface ExecutionState {
   filesChanged: FileChange[];
   startingCommit?: string;
   modernizationCommit?: string;
+  /** The server-owned run branch holding modernizationCommit. Never client-set. */
+  runRef?: string;
+  /** The allowlisted catalogue operation that was executed. */
+  operationId?: string;
+}
+
+// ── Checkpoint run (the engine's real, verbatim result) ───────────────────────
+//
+// These mirror the JSON that tools/checkpoint.js and tools/validate.js actually
+// write. The engine reports COUNTS, not a per-test list, and it never measures
+// code coverage — so nothing here invents either. Every field the engine does not
+// emit is optional and shown as "not reported", never as a zero or a blank.
+
+/** One legacy-suite validation, as tools/validate.js writes it. */
+export interface CheckpointValidation {
+  status: string;
+  passed?: number;
+  failed?: number;
+  skipped?: number;
+  total?: number;
+  exitCode?: number | null;
+  /** The exact command that ran, verbatim from the engine. */
+  command?: string;
+  timestamp?: string;
+  /** Raw harness stdout. Real evidence, not a summary. */
+  output?: string;
+  error?: string | null;
+}
+
+/** One rollback, as tools/rollback.js writes it. */
+export interface CheckpointRollback {
+  status: string;
+  targetCommit?: string;
+  revertCommit?: string | null;
+  branch?: string;
+  reason?: string;
+  filesChanged?: string[];
+  validationRequired?: boolean;
+  runtimeNote?: string;
+}
+
+/** The engine's result file, passed through verbatim by the backend. */
+export interface CheckpointRun {
+  /** VERIFIED | RECOVERY_VERIFIED | RECOVERY_FAILED | VALIDATION_FAILED | REFUSED */
+  status: string;
+  finalStatus?: string;
+  modernizationStep?: string;
+  startingCommit?: string;
+  modernizationCommit?: string;
+  branch?: string;
+  validationResult?: CheckpointValidation | null;
+  rollbackResult?: CheckpointRollback | null;
+  recoveryValidation?: CheckpointValidation | null;
+  timestamp?: string;
+  runtimeNote?: string;
+}
+
+export interface CheckpointRefusal {
+  code: string;
+  message: string;
+}
+
+export type CheckpointRunStatus = "created" | "running" | "complete" | "refused" | "failed";
+
+/** The backend's view of a checkpoint run: the lifecycle plus the engine's result. */
+export interface CheckpointRunView {
+  id: string;
+  analysisRunId: string;
+  status: CheckpointRunStatus;
+  /** Short form of the subject commit, for display. */
+  subjectCommit: string | null;
+  /** The engine's own state, verbatim. Never a restatement. */
+  checkpointStatus: string | null;
+  checkpoint: CheckpointRun | null;
+  refusal: CheckpointRefusal | null;
+  cleanupWarning: string;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
 }
 
 // ── Verification (Verify phase) ──────────────────────────────────────────────
@@ -256,4 +335,15 @@ export interface WorkflowState {
 
 export interface WorkflowContextValue {
   state: WorkflowState;
+  /**
+   * Replace the workflow state with a newer server-authoritative copy.
+   *
+   * Needed because Execute and Verify are state-changing requests: the server
+   * rewrites the run record's `execution` block and returns the whole updated
+   * workflow. Adopting that response is the honest update — it is the server's
+   * record of what it actually committed, not a local guess. The setter exists
+   * in the context so no screen keeps a second copy of the workflow and the two
+   * cannot drift.
+   */
+  updateWorkflow: (next: WorkflowState) => void;
 }

@@ -24,16 +24,21 @@ export function useWorkflow(): WorkflowContextValue {
 interface WorkflowProviderProps {
   /** Pre-fetched workflow state from the backend (or mock). */
   state: WorkflowState;
+  /** Adopt a newer server-authoritative copy (the Execute/Verify responses). */
+  onStateChange?: (next: WorkflowState) => void;
   children: ReactNode;
 }
 
 /**
  * Wraps the dashboard. Provides a single WorkflowState to all screens.
- * The state is owned by App (fetched from backend) and passed in as a prop.
+ * The state is owned by App (fetched from backend) and passed in as a prop, so
+ * there is exactly one copy of it and no second store to fall out of step.
  */
-export function WorkflowProvider({ state, children }: WorkflowProviderProps) {
+export function WorkflowProvider({ state, onStateChange, children }: WorkflowProviderProps) {
   const value: WorkflowContextValue = {
     state,
+    // A no-op only if the host forgot the callback; App always passes one.
+    updateWorkflow: (next) => onStateChange?.(next),
   };
 
   return (

@@ -280,10 +280,18 @@ test("KNOWN LIMITATION, unchanged by M3.3: the engine composes one git command a
 });
 
 test("the backend binds loopback only and does not allow any origin", () => {
-  const index = OWNED.find((s) => s.relative === "backend/src/index.ts");
-  assert.match(index.code, /["']127\.0\.0\.1["']/, "the server must not listen on every interface");
+  // src/app.ts holds the pipeline since the integration milestone: index.ts only
+  // listens. Reading index.ts here would have gone on passing after the config
+  // moved, which is the failure mode this assertion exists to prevent.
+  const app = OWNED.find((s) => s.relative === "backend/src/app.ts");
+  assert.ok(app, "src/app.ts must exist and own the request pipeline");
+  // The bind lives with the listen call, in index.ts; the pipeline lives in
+  // app.ts. Reading either from the other is how a check goes on passing after
+  // the code moved, which is the failure this assertion exists to prevent.
+  const entry = OWNED.find((s) => s.relative === "backend/src/index.ts");
+  assert.match(entry.code, /listen\(\s*PORT\s*,\s*["']127\.0\.0\.1["']/, "the server must not listen on every interface");
   assert.deepEqual(
-    describe(codeOccurrences([index], /listen\(\s*0\.0\.0\.0/)),
+    describe(codeOccurrences(OWNED, /listen\(\s*0\.0\.0\.0/)),
     [],
     "a bare 0.0.0.0 listen is the thing to avoid",
   );
@@ -293,10 +301,24 @@ test("the backend binds loopback only and does not allow any origin", () => {
     "CORS must not be a wildcard",
   );
   for (const devOrigin of ["http://localhost:5173", "http://localhost:4173"]) {
-    assert.ok(index.raw.includes(devOrigin), `expected the dev origin ${devOrigin} in the allowlist`);
+    assert.ok(app.raw.includes(devOrigin), `expected the dev origin ${devOrigin} in the allowlist`);
   }
   // A body limit is a trust boundary, not a tuning knob.
-  assert.match(index.code, /json\(\s*\{\s*limit\s*:/);
+  assert.match(app.code, /json\(\s*\{\s*limit\s*:/);
+});
+
+test("a malformed or over-sized body is answered in the API envelope, never as HTML", () => {
+  // body-parser's default failure is an HTML error page. A client that parses
+  // every response as {success, error} would break on it, and the page echoes
+  // request content back — this API never echoes input.
+  const app = OWNED.find((s) => s.relative === "backend/src/app.ts");
+  assert.match(app.code, /entity\.parse\.failed/, "a JSON parse failure must be restated");
+  assert.match(app.code, /entity\.too\.large/, "an over-sized body must be restated");
+  assert.match(app.code, /MALFORMED_BODY/);
+  assert.match(app.code, /BODY_TOO_LARGE/);
+  // The parser's own message is not forwarded: it quotes the request.
+  assert.equal(/err\.message/.test(app.code), false, "never forward the body parser's message");
+  assert.equal(/error\.message/.test(app.code), false, "never forward the body parser's message");
 });
 
 test("the checkpoint runner takes no root, path or command from a caller", () => {

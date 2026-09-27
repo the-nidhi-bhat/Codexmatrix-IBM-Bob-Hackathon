@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import { useWorkflow } from "../workflow/WorkflowContext";
+import type { ModernizationController } from "../workflow/useModernization";
 
 const TIMELINE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
   regression: { icon: "✗", color: "var(--red)",    bg: "var(--red-dim)" },
@@ -24,12 +25,76 @@ const RECOVERY_STATUS_CONFIG: Record<string, { label: string; color: string }> =
   not_run: { label: "not run", color: "var(--muted)" },
 };
 
-export default function RollbackScreen() {
+export default function RollbackScreen({ controller }: { controller: ModernizationController }) {
   const { state } = useWorkflow();
   const rb = state.rollback;
   const [step, setStep] = useState(0);
   const rollbackStatus = ROLLBACK_STATUS_CONFIG[rb.rollbackStatus] ?? { label: "Unknown status", color: "var(--muted)" };
   const recoveryStatus = RECOVERY_STATUS_CONFIG[rb.recoveryValidation] ?? { label: "Unknown status", color: "var(--muted)" };
+
+  // What the engine actually did, when it did anything. tools/rollback.js is
+  // invoked by tools/checkpoint.js itself on a validation failure, and its
+  // result plus the recovery re-validation are in the run's result file. These
+  // are the server's own values, shown verbatim — a revert commit SHA, the
+  // branch it landed on, the files it changed, and the second run's counts.
+  const engine = controller.view?.checkpoint ?? null;
+  const revert = engine?.rollbackResult ?? null;
+  const recovery = engine?.recoveryValidation ?? null;
+
+  if (revert || recovery) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Rollback</h2>
+          <p style={{ color: "var(--muted)" }}>
+            {controller.view?.checkpointStatus === "RECOVERY_VERIFIED"
+              ? "A regression was detected, reverted, and the legacy suite passed again."
+              : `Checkpoint state: ${controller.view?.checkpointStatus ?? "unknown"}`}
+          </p>
+        </div>
+
+        {revert && (
+          <div className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="section-title">Revert</div>
+            <div style={{ fontSize: 13 }}>
+              Status <strong style={{ color: revert.status === "ROLLED_BACK" ? "var(--green)" : "var(--red)" }}>{revert.status}</strong>
+            </div>
+            {revert.reason && <div style={{ fontSize: 13, color: "var(--muted)" }}>{revert.reason}</div>}
+            <div className="mono" style={{ fontSize: 11 }}>
+              {revert.targetCommit && <div>target&nbsp;&nbsp;{revert.targetCommit}</div>}
+              {revert.revertCommit && <div>revert&nbsp;&nbsp;{revert.revertCommit}</div>}
+              {revert.branch && <div>branch&nbsp;{revert.branch}</div>}
+            </div>
+            {revert.filesChanged && revert.filesChanged.length > 0 && (
+              <div className="mono" style={{ fontSize: 11, color: "var(--accent)" }}>
+                {revert.filesChanged.join("  ")}
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              History is preserved: the change is reverted with a new commit, never with a reset.
+            </div>
+          </div>
+        )}
+
+        {recovery && (
+          <div className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="section-title">Recovery Validation</div>
+            <div style={{ fontSize: 13 }}>
+              The 18-test legacy suite was re-run after the revert:{" "}
+              <strong style={{ color: recovery.failed ? "var(--red)" : "var(--green)" }}>{recovery.status}</strong> ·{" "}
+              {recovery.passed ?? "—"} passed, {recovery.failed ?? "—"} failed, {recovery.skipped ?? "—"} skipped
+              {typeof recovery.total === "number" ? ` of ${recovery.total}` : ""}
+            </div>
+            {recovery.command && (
+              <div className="mono" style={{ fontSize: 11, color: "var(--muted)", wordBreak: "break-all" }}>
+                {recovery.command}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (!ROLLBACK_STATUS_CONFIG[rb.rollbackStatus]) {
     return (

@@ -247,46 +247,72 @@ test("the concurrency gate is a real exclusive slot, exported for exactly this",
   releaseCheckpointSlot();
 });
 
-test("the router does not expose a rollback or abort endpoint yet", () => {
+test("the routers expose no rollback or abort endpoint yet", () => {
   // The M3.3 audit's deferred items, asserted so that adding one has to be a
   // deliberate, visible change to this test rather than a silent one.
-  const source = require("node:fs").readFileSync(
-    require("node:path").join(__dirname, "..", "dist", "routes", "checkpoint.js"),
-    "utf8",
-  );
-  // The complete route table, verb by verb. Adding an endpoint — a rollback, an
-  // abort, ref forwarding — is a product decision, so it has to change this
-  // assertion visibly rather than slipping in as a refactor.
-  const expected = {
-    "router.post": ["/checkpoint-runs", "/checkpoint-runs/:id/verify"],
-    "router.get": ["/checkpoint-runs/:id"],
-    "router.delete": [],
-    "router.put": [],
-    "router.patch": [],
+  const routeTable = {
+    "checkpoint": {
+      "router.post": ["/checkpoint-runs", "/checkpoint-runs/:id/verify"],
+      "router.get": ["/checkpoint-runs/:id"],
+      "router.delete": [],
+      "router.put": [],
+      "router.patch": [],
+    },
+    // The integration milestone's new router, pinned here for the same reason.
+    "modernization": {
+      "router.post": ["/modernization/execute"],
+      "router.get": ["/modernization/operations"],
+      "router.delete": [],
+      "router.put": [],
+      "router.patch": [],
+    },
   };
-  for (const [method, routes] of Object.entries(expected)) {
-    const pattern = new RegExp(`${method.replace(".", "\\.")}\\("([^"]+)"`, "g");
-    const found = [...source.matchAll(pattern)].map((m) => m[1]);
-    assert.deepEqual(
-      found,
-      routes,
-      `unexpected ${method} route(s); a new endpoint is a product decision, not a refactor`,
+  for (const [file, expected] of Object.entries(routeTable)) {
+    const source = require("node:fs").readFileSync(
+      require("node:path").join(__dirname, "..", "dist", "routes", `${file}.js`),
+      "utf8",
     );
+    // The complete route table, verb by verb. Adding an endpoint — a rollback, an
+    // abort, a client-chosen ref — is a product decision, so it has to change
+    // this assertion visibly rather than slipping in as a refactor.
+    for (const [method, routes] of Object.entries(expected)) {
+      const pattern = new RegExp(`${method.replace(".", "\\.")}\\("([^"]+)"`, "g");
+      const found = [...source.matchAll(pattern)].map((m) => m[1]);
+      assert.deepEqual(
+        found,
+        routes,
+        `unexpected ${method} in ${file}; a new endpoint is a product decision, not a refactor`,
+      );
+    }
   }
 });
 
-test("the check request accepts analysisRunId and nothing else, so no ref can be forwarded", async () => {
-  // The M3.3 route deliberately does not forward a ref: the anchor stays
-  // server-chosen. That is a product decision recorded as a decision, and this
-  // is the assertion that holds it.
+test("the verify route forwards a ref, but only one it resolved from the server's own run record", async () => {
+  // This assertion was inverted by the integration milestone, and deliberately.
+  // Passing no ref was not a safety property — it made the runner default the
+  // anchor to the integration branch and check out DETACHED, which cannot verify
+  // a modernization commit (it is a child of the tip) and loses the revert. So the
+  // route now passes a ref, and the property worth holding is WHERE it came
+  // from: `subject.ref`, out of the server-owned run record, validated against the
+  // executor's own RUN_BRANCH pattern. Never from a request.
   const source = require("node:fs").readFileSync(
     require("node:path").join(__dirname, "..", "dist", "routes", "checkpoint.js"),
     "utf8",
   );
   const call = source.match(/runCheckpoint\)\((\{[\s\S]*?\})\)/);
   assert.ok(call, "the route must call runCheckpoint");
-  assert.match(call[1], /commit:\s*subject/, "the only value it passes is the resolved subject");
-  assert.equal(/\bref\s*:/.test(call[1]), false, "the route must not forward a client ref");
+  assert.match(call[1], /commit:\s*subject\.commit/, "the commit comes from the resolved subject");
+  assert.match(call[1], /ref:\s*subject\.ref/, "the ref comes from the resolved subject");
+
+  // Nothing that a client could name may appear as a forwarded key.
+  for (const forbidden of ["req.body", "req.query", "req.params", "body.", "query."]) {
+    assert.equal(call[1].includes(forbidden), false, `the call must not read ${forbidden}`);
+  }
   assert.equal(/\bbranch\s*:/.test(call[1]), false, "the route must not forward a client branch");
   assert.equal(/anc(hor)?Ref\s*:/.test(call[1]), false, "the route must not forward a client anchorRef");
+
+  // And the resolver only accepts a ref that matches the executor's own pattern,
+  // so a value that did come from a client would still be refused.
+  assert.match(source, /RUN_BRANCH\.test\(ref\)/, "the ref must be pattern-checked against the run-branch form");
+  assert.match(source, /COMMIT_SHA\.test\(commit\)/, "the commit must be a full 40-hex SHA");
 });
