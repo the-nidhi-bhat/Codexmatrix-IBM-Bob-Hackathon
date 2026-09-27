@@ -1,0 +1,33 @@
+body {
+	margin: 0px;
+	padding: 0px;
+}
+
+div#wrapper {
+    margin: auto;
+	width: 350px;
+	height: 250px;
+}
+
+input#eval-input {
+	margin-left: 14px;
+	width: 260px;
+    border-radius: 5px;
+    padding-left: 4px;
+    border: 1px solid #03244d;
+}
+
+input#eval-input:focus {
+    outline: none;
+    border: 2px solid #496e9c;
+}
+
+input#submit-input {
+    border: 1px solid #03244d;
+    border-radius: 5px;
+}
+
+input#submit-input:focus {
+    outline: none;
+    border: 2px solid #496e9c;
+}
