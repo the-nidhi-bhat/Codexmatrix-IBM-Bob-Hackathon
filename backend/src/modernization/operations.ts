@@ -196,10 +196,73 @@ export function describeOperations(): Array<{
   }));
 }
 
+// ── protected paths ───────────────────────────────────────────────────────────
+
+/**
+ * The safety/control plane, which catalogue-driven modernization may never
+ * rewrite.
+ *
+ * Why this exists in addition to the root containment check: containment only
+ * proves a path stays inside the repository. tools/checkpoint.js IS inside the
+ * repository, so containment happily allows it — and an operation that edited
+ * the engine which verifies the operation would be verifying its own rewrite.
+ * The same applies to the characterization suite, the run records, and this
+ * backend's own runner, executor and routes.
+ *
+ * These are directory prefixes and exact file names, not globs, and the
+ * comparison is on the normalized repository-relative path, so `tools/../tools/
+ * checkpoint.js`, `tools\checkpoint.js` and `./TOOLS/checkpoint.js` are all
+ * caught. Case is folded because Windows resolves paths case-insensitively: a
+ * denylist that a differently-cased spelling walks straight through is not a
+ * denylist on this platform.
+ *
+ * Deliberately NOT listed: the root `package.json` and everything under
+ * `server/`. F-12 exists to rewrite the root package.json dependency, and the
+ * whole point of the catalogue is to modernize the legacy app. Blocking those
+ * would block the work.
+ *
+ * Every entry is already lower case, because normalizeRelative lower-cases what
+ * it is given: an entry written as `PLAN.md` would compare `plan.md` to
+ * `PLAN.md`, fail, and leave the most obviously protected file in the
+ * repository unprotected.
+ */
+const PROTECTED_PATHS: readonly string[] = Object.freeze([
+  "tools", // checkpoint.js, validate.js, rollback.js and their tests
+  "legacy", // the 18 characterization tests and the reproducible lock
+  "validation", // run records the engine reads and writes
+  "backend", // this harness: checkpointRunner, executor, operations, routes
+  "ibm_bob", // the recorded Bob evidence
+  "bob_sessions", // the recorded session evidence
+  ".opencode", // agent/automation configuration
+  ".git", // the repository itself
+  "plan.md", // the written modernization plan
+  "assess.md", // the written assessment the plan is derived from
+]);
+
+/**
+ * Normalize a catalogue-relative path to the form the denylist is written in:
+ * forward slashes, no `./` prefix, no `..` segments, lower case.
+ *
+ * `path.posix.normalize` collapses `a/../b` and `./`, and the backslash swap
+ * handles a Windows-style separator. A path that escapes the root keeps its
+ * leading `..` after normalization, so it cannot match an entry here; it is
+ * refused a moment later by resolveInRoot's containment check instead.
+ */
+function normalizeRelative(relative: string): string {
+  return path.posix.normalize(relative.replace(/\\/g, "/")).replace(/^\.\//, "").toLowerCase();
+}
+
+/** Is this normalized repository-relative path the safety plane or inside it? */
+export function isProtectedPath(relative: string): boolean {
+  const target = normalizeRelative(relative);
+  return PROTECTED_PATHS.some((entry) => target === entry || target.startsWith(`${entry}/`));
+}
+
 // ── exact-match contract ─────────────────────────────────────────────────────
 
 export type EditFailureCode =
   | "FILE_OUTSIDE_ROOT"
+  | "PROTECTED_PATH"
   | "SOURCE_NOT_FOUND"
   | "SOURCE_AMBIGUOUS"
   | "DUPLICATE_TARGET_FILE";
@@ -298,6 +361,13 @@ export function planOperation(root: string, operation: ModernizationOperation): 
       return { ok: false, operationId: operation.id, code: "DUPLICATE_TARGET_FILE", file: edit.file, occurrences: -1 };
     }
     seen.add(edit.file);
+
+    // Checked before the path is resolved and before anything is read, so a
+    // protected file is refused whether or not it exists — no existence leak,
+    // and no way for a missing file to turn a refusal into a read.
+    if (isProtectedPath(edit.file)) {
+      return { ok: false, operationId: operation.id, code: "PROTECTED_PATH", file: edit.file, occurrences: -1 };
+    }
 
     const full = resolveInRoot(root, edit.file);
     if (full === null) {

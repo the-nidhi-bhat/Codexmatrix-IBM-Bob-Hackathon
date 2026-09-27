@@ -92,6 +92,7 @@ export type CheckpointOutcome = "COMPLETED" | "REJECTED" | "FAILED";
 export interface CheckpointRunError {
   code:
     | "INVALID_COMMIT_SHA"
+    | "INVALID_REF"
     | "UNTRUSTED_REF"
     | "REF_NOT_FOUND"
     | "REPO_ROOT_UNRESOLVED"
@@ -155,6 +156,20 @@ export interface RunCheckpointOptions {
 function isInside(candidate: string, parent: string): boolean {
   const rel = path.relative(parent, candidate);
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
+/**
+ * A caller value is text only if it IS text.
+ *
+ * Both entry points are typed `string`, but a JavaScript caller, a future
+ * route forwarding client data, or a JSON body can still hand over a number,
+ * an object, an array or a boolean. Calling `.trim()` on one of those throws a
+ * raw TypeError out of a function whose whole contract is that it resolves
+ * with a structured result for every expected outcome — so a wrong *type* must
+ * be handled the same way as a wrong *value*, not by crashing.
+ */
+function asText(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 /** The repository is resolved server-side from this module's own location. */
@@ -224,7 +239,7 @@ async function removeWorktree(root: string, worktreePath: string): Promise<Check
 export async function runCheckpoint(options: RunCheckpointOptions): Promise<CheckpointRunResult> {
   const startedAt = Date.now();
   const runId = uuidv4();
-  const commit = (options.commit ?? "").trim();
+  const commit = asText(options.commit).trim();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const worktreePath = path.join(os.tmpdir(), `lcw-wt-${runId}`);
   const resultFile = path.join(worktreePath, "validation", RESULT_FILE_NAME);
@@ -265,7 +280,22 @@ export async function runCheckpoint(options: RunCheckpointOptions): Promise<Chec
 
   // The anchor is a NAME resolved server-side, never the ambient HEAD, and a
   // supplied ref is only honoured inside the executor's run-branch namespace.
-  const requestedRef = (options.ref ?? "").trim();
+  // The type is checked before .trim() so a non-string can never throw: an
+  // absent ref (undefined/null) means "use the default anchor", but a ref of
+  // the wrong type is a contract violation and is refused, not silently
+  // downgraded to the default. Downgrading would widen the trusted anchor set,
+  // which is the one thing this check exists to prevent. Nothing is echoed.
+  if (options.ref !== undefined && options.ref !== null && typeof options.ref !== "string") {
+    return finish({
+      error: {
+        code: "INVALID_REF",
+        message:
+          "The anchor ref must be a string. Omit it to anchor on " + INTEGRATION_BRANCH +
+          ", or pass a server-owned lcw/modernization/<uuid> branch name.",
+      },
+    });
+  }
+  const requestedRef = asText(options.ref).trim();
   if (requestedRef !== "" && !RUN_BRANCH.test(requestedRef)) {
     return finish({
       error: {

@@ -54,6 +54,29 @@ for (var i = 0; i < args.length; i++) {
 }
 
 // ── The validation command (exactly as documented in PLAN.md) ───────────────
+// Why this is `npm install` and NOT `npm ci` (M3.3 audit finding 4)
+//
+// An independent audit correctly flagged that `npm install` does not enforce
+// the dependency lock, so a changed transitive dependency could silently alter
+// what the 18 tests run against while the result still reported "VERIFIED".
+// The fix is NOT to switch to `npm ci`, because `npm ci` does not exist in this
+// runtime. Verified empirically against the image this file uses:
+//
+//   docker run --rm node:6 bash -c "npm --version"  ->  3.10.10
+//   docker run --rm node:6 bash -c "npm ci"        ->  exit 1, usage error
+//
+// `npm ci` was introduced in npm 5.7.0; node:6 ships npm 3.10.10, and no flag
+// makes it available. Upgrading the container would stop this being a legacy
+// characterization target, which is the entire purpose of the suite. On top of
+// that `npm ci` needs a committed lockfile at /app: the root
+// package-lock.json is deliberately NOT committed (.gitignore documents why — a
+// lockfile from a modern host npm must never enter this tree), and npm 3 does
+// not even write one. The reproducible reference install is captured the old
+// way, in legacy/get24-baseline/repro/npm-shrinkwrap.json.
+//
+// Switching to `npm ci` here would turn every validation run into a usage
+// error, i.e. a false safety net. backend/test/validation-tooling.test.js locks
+// this decision in so the next reader does not "fix" it blindly.
 var DOCKER_CMD = 'docker';
 var DOCKER_ARGS = [
   'run', '--rm',

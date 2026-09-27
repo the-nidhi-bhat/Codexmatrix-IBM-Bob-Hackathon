@@ -119,7 +119,7 @@ export interface ModernizationExecutionResult {
   commitMessage: string | null;
   worktreePath: string;
   /** false here means a worktree may still exist and must be inspected. */
-  cleanup: { removed: boolean; warning?: string };
+  cleanup: { removed: boolean; warning?: string; branchRemoved?: boolean };
   durationMs: number;
 }
 
@@ -136,7 +136,8 @@ export interface ExecuteOperationOptions {
 
 // ponytail: git()/isInside() are a dozen lines each and now exist in both this
 // file and checkpointRunner.ts. Sharing them means a new module; duplicating
-// them is smaller. Extract in M3.3 when the runner is refactored anyway.
+// them is smaller. A previous note here said "extract in M3.3" — M3.3 landed
+// without the extraction, so the duplication is now simply the chosen shape.
 function isInside(candidate: string, parent: string): boolean {
   const rel = path.relative(parent, candidate);
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
@@ -217,6 +218,31 @@ async function removeWorktree(root: string, worktreePath: string): Promise<Moder
         warning: `execute worktree NOT removed, remove it manually from ${worktreePath}: ${reason(second)}`,
       };
     }
+  }
+}
+
+/**
+ * Delete a run branch that this execution created, after a refusal.
+ *
+ * `git branch -d` only, never -D, and that is the safety property rather than a
+ * limitation: a branch that somehow carries an unmerged commit is then left in
+ * place and reported, never destroyed. On every refusal path no commit was
+ * made, so the branch still points at the base and the safe delete succeeds.
+ * If a run ever failed *after* committing, this is what stops the cleanup from
+ * eating the commit the verify stage needs.
+ */
+async function removeRunBranch(
+  root: string,
+  branch: string,
+): Promise<{ removed: boolean; warning?: string }> {
+  try {
+    await git(root, ["branch", "-d", branch]);
+    return { removed: true };
+  } catch (err) {
+    return {
+      removed: false,
+      warning: `run branch ${branch} NOT removed; it is not safely deletable and was left in place: ${reason(err)}`,
+    };
   }
 }
 
@@ -323,6 +349,10 @@ export async function executeOperationInWorktree(
   const branchExists = await git(root, ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], 30_000)
     .then(() => true)
     .catch(() => false);
+  // Only a branch this execution creates may be cleaned up later. A branch that
+  // already existed belongs to an earlier run and is never removed, however
+  // similar its name.
+  const createdBranch = !branchExists;
 
   try {
     // -b creates the run branch at the integration tip; without -b an existing
@@ -335,6 +365,14 @@ export async function executeOperationInWorktree(
       branchExists ? branch : baseCommit,
     ]);
   } catch (err) {
+    // git creates the branch before the worktree, so a failed add can still
+    // leave the ref behind. Undo it here, where the finally block is not yet
+    // in scope.
+    if (createdBranch) {
+      const branchCleanup = await removeRunBranch(root, branch);
+      result.cleanup.branchRemoved = branchCleanup.removed;
+      if (branchCleanup.warning) result.cleanup.warning = branchCleanup.warning;
+    }
     return refuse("WORKTREE_CREATE_FAILED", reason(err));
   }
 
@@ -394,6 +432,19 @@ export async function executeOperationInWorktree(
     return result;
   } finally {
     result.cleanup = await removeWorktree(root, worktreePath);
+    // A successful run KEEPS its branch: the verify and rollback stages attach
+    // to it. A refused or failed run keeps nothing, so the branch this run
+    // created is removed — otherwise every refusal leaves a permanent ref at the
+    // base commit and `git branch` fills with debris.
+    if (createdBranch && result.status !== "completed") {
+      const branchCleanup = await removeRunBranch(root, branch);
+      result.cleanup.branchRemoved = branchCleanup.removed;
+      if (branchCleanup.warning) {
+        result.cleanup.warning = result.cleanup.warning
+          ? `${result.cleanup.warning}; ${branchCleanup.warning}`
+          : branchCleanup.warning;
+      }
+    }
     result.durationMs = Date.now() - startedAt;
   }
 }
