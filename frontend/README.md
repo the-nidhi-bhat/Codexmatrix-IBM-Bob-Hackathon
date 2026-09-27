@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# Legacy Code Whisperer frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The existing interface is a React 19, TypeScript, and Vite single-page application. Its entry point is `src/main.tsx`; `src/App.tsx` coordinates repository entry, workflow screens, state, and in-app navigation. The API client is `src/api/workflowApi.ts`, and execute/checkpoint request state is managed by `src/workflow/useModernization.ts`.
 
-Currently, two official plugins are available:
+Screens include landing and repository entry, architecture, overview, risk, plan, execution, verification, rollback, and report. Styling is hand-written CSS with light and dark themes. Navigation uses React state; routes are not reflected in the URL. Some overview/report presentation data is illustrative mock data, while repository analysis and execute/checkpoint actions use the backend API.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Local development
 
-## React Compiler
+From this directory:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm ci
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Vite serves the UI at `http://localhost:5173` and proxies `/api` to `http://localhost:3001`. Start the backend separately; see [../backend/README.md](../backend/README.md).
+
+## Checks
+
+```sh
+npm test
+npm run build
+npm run lint
+```
+
+The contract test exercises checkpoint API response handling. The production build runs the TypeScript project build followed by Vite. The lint command uses oxlint.
