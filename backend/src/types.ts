@@ -209,3 +209,50 @@ export interface ErrorResponse {
     phase: WorkflowPhase;
   };
 }
+
+// ── Checkpoint run API ────────────────────────────────────────────────────────
+// Server-owned lifecycle around one real tools/checkpoint.js run. The client may
+// only name an analysis run that already exists on this server; every value in
+// the view below comes from the server or from the engine's own result file.
+
+/** Lifecycle of the SERVER's run record. "complete" means the engine produced a
+ *  result — the checkpoint's own meaning is checkpointStatus, not this. */
+export type CheckpointRunStatus = "created" | "running" | "complete" | "refused" | "failed";
+
+export interface CheckpointRefusal {
+  code: string;
+  message: string;
+}
+
+export interface CheckpointRunView {
+  id: string;
+  analysisRunId: string;
+  status: CheckpointRunStatus;
+  /** Server-resolved subject commit (short form). Null until the server can
+   *  resolve it — the client can never supply this. */
+  subjectCommit: string | null;
+  /** The engine's canonical status, verbatim: VERIFIED | RECOVERY_VERIFIED |
+   *  RECOVERY_FAILED | VALIDATION_FAILED | REFUSED.
+   *  Null means the engine has NOT run; nothing here is ever inferred. */
+  checkpointStatus: string | null;
+  /** tools/checkpoint.js's own result file, passed through verbatim. Counts in
+   *  it (validationResult.passed / .failed / .total / .skipped) are the only
+   *  counts that exist — they are never recomputed or restated here. */
+  checkpoint: Record<string, unknown> | null;
+  refusal: CheckpointRefusal | null;
+  /** True when the isolated worktree could not be removed. The path and the
+   *  tool's own output stay in the server log, never in a client message. */
+  cleanupWarning: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface CreateCheckpointRunRequest {
+  analysisRunId: string;
+}
+
+export interface CheckpointRunResponse {
+  success: true;
+  checkpointRun: CheckpointRunView;
+}

@@ -7,6 +7,12 @@ const router = Router();
 // In-memory run store (replace with Redis/DB for production)
 const runs = new Map<string, WorkflowState>();
 
+/** Server-side lookup of a stored analysis run. Exported so other routers can
+ *  resolve a run by id without a second store or a client-supplied value. */
+export function getRun(runId: string): WorkflowState | undefined {
+  return runs.get(runId);
+}
+
 // ponytail: one clone at a time. The analysis walk is synchronous, so a queue is
 // enough for a demo; use a job queue if this ever takes real traffic.
 const MAX_CONCURRENT_ANALYSES = 1;
