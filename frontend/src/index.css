@@ -65,6 +65,9 @@
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --mono: "SF Mono", "Cascadia Mono", "JetBrains Mono", "Consolas", ui-monospace, monospace;
 
+  /* motion — short, eased, never bouncy */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
   /* paper stock — a fine fibrous grain laid over every surface */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
 
@@ -271,7 +274,9 @@ h1, h2, h3, h4 {
   letter-spacing: -0.005em;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  transition:
+    background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s,
+    transform 0.2s var(--ease);
 }
 
 .btn:focus-visible {
@@ -321,6 +326,20 @@ h1, h2, h3, h4 {
 .btn-accent:hover:not(:disabled) { background: var(--accent-ink); }
 
 .btn-lg { padding: 11px 22px; font-size: 14px; border-radius: 8px; }
+
+/* micro-motion — a 1px lift on the buttons that actually do something */
+.btn-solid:hover:not(:disabled),
+.btn-accent:hover:not(:disabled),
+.btn-outline:hover:not(:disabled),
+.btn-danger:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+
+/* trailing arrow slides forward on hover */
+.btn-arrow {
+  display: inline-block;
+  transition: transform 0.22s var(--ease);
+}
+.btn:hover:not(:disabled) .btn-arrow { transform: translateX(3px); }
 
 /* ── tags & pills ─────────────────────────────────────────────── */
 
@@ -555,8 +574,10 @@ button {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }

@@ -169,21 +169,23 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
               <span>Workflow request failed: {actionError}</span>
             </div>
           )}
-          {active === "architecture" && <ArchitectureScreen />}
-          {active === "overview"    && <OverviewScreen repoUrl={repoUrl} />}
-          {active === "risk"        && <RiskScreen />}
-          {active === "plan"        && <PlanScreen />}
-          {active === "execution"   && (
-            <ExecutionScreen
-              onVerify={() => navigate("verification")}
-              onRollback={() => navigate("rollback")}
-              onExecute={executeNextStep}
-              onRunVerification={verifyRepository}
-            />
-          )}
-          {active === "verification" && <VerificationScreen onRollback={() => navigate("rollback")} onRunVerification={verifyRepository} />}
-          {active === "rollback"     && <RollbackScreen />}
-          {active === "report"       && <ReportScreen />}
+          <div className="screen" key={active}>
+            {active === "architecture" && <ArchitectureScreen />}
+            {active === "overview"    && <OverviewScreen repoUrl={repoUrl} />}
+            {active === "risk"        && <RiskScreen />}
+            {active === "plan"        && <PlanScreen />}
+            {active === "execution"   && (
+              <ExecutionScreen
+                onVerify={() => navigate("verification")}
+                onRollback={() => navigate("rollback")}
+                onExecute={executeNextStep}
+                onRunVerification={verifyRepository}
+              />
+            )}
+            {active === "verification" && <VerificationScreen onRollback={() => navigate("rollback")} onRunVerification={verifyRepository} />}
+            {active === "rollback"     && <RollbackScreen />}
+            {active === "report"       && <ReportScreen />}
+          </div>
         </main>
       </div>
     </div>

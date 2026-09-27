@@ -16,6 +16,40 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes riseSm {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes drop {
+  from { opacity: 0; transform: translateY(-7px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── scroll reveal ────────────────────────────────────────────────
+   Nothing is hidden until `useReveal` marks the root `.reveal-ready`,
+   so the page still reads correctly if that never runs.            */
+
+.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+  transition-delay: var(--d, 0ms);
+}
+.reveal-ready [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+@media (scripting: none) {
+  .reveal-ready [data-reveal] { opacity: 1; transform: none; }
+}
+
+
 .app {
   min-height: 100vh;
   display: flex;
@@ -212,7 +246,7 @@
   text-align: left;
   color: var(--text-2);
   border-left: 2px solid transparent;
-  transition: background 0.13s, color 0.13s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .nav-item:hover { background: rgba(255, 255, 255, 0.6); color: var(--text); }
 
@@ -223,6 +257,18 @@
   font-weight: 600;
   box-shadow: var(--shadow-xs);
 }
+
+/* the rail cascades in behind the top bar */
+.rail .nav-item { animation: riseSm 0.36s var(--ease) both; }
+.rail .nav-item:nth-child(2) { animation-delay: 0.04s; }
+.rail .nav-item:nth-child(3) { animation-delay: 0.08s; }
+.rail .nav-item:nth-child(4) { animation-delay: 0.12s; }
+.rail .nav-item:nth-child(5) { animation-delay: 0.16s; }
+.rail .nav-item:nth-child(6) { animation-delay: 0.2s; }
+.rail .nav-item:nth-child(7) { animation-delay: 0.24s; }
+.rail .nav-item:nth-child(8) { animation-delay: 0.28s; }
+.rail .nav-item:nth-child(9) { animation-delay: 0.32s; }
+
 
 .nav-icon {
   width: 17px;
@@ -298,6 +344,10 @@
   z-index: 1;
 }
 
+/* one gentle rise each time the workflow tab changes */
+.screen { animation: rise 0.34s var(--ease) both; }
+
+
 .alert {
   display: flex;
   align-items: flex-start;
@@ -342,6 +392,25 @@
   align-items: center;
   gap: 14px;
 }
+
+/* ── entrance — the input screen assembles top to bottom ───────── */
+
+.start-top { animation: drop 0.4s var(--ease) both; }
+
+.start-grid > div > * { animation: rise 0.5s var(--ease) both; }
+.start-grid > div > *:nth-child(1) { animation-delay: 0.05s; }
+.start-grid > div > *:nth-child(2) { animation-delay: 0.11s; }
+.start-grid > div > *:nth-child(3) { animation-delay: 0.17s; }
+.start-grid > div > *:nth-child(4) { animation-delay: 0.23s; }
+.start-grid > aside { animation: rise 0.5s var(--ease) 0.16s both; }
+
+.process-step { animation: riseSm 0.45s var(--ease) both; }
+.process-step:nth-child(1) { animation-delay: 0.2s; }
+.process-step:nth-child(2) { animation-delay: 0.26s; }
+.process-step:nth-child(3) { animation-delay: 0.32s; }
+.process-step:nth-child(4) { animation-delay: 0.38s; }
+.process-step:nth-child(5) { animation-delay: 0.44s; }
+
 
 .demo-chip {
   font-size: 10px;
@@ -682,6 +751,7 @@
   -webkit-backdrop-filter: saturate(1.35) blur(8px);
   backdrop-filter: saturate(1.35) blur(8px);
   border-bottom: 1px solid var(--line);
+  animation: drop 0.45s var(--ease) both;
 }
 
 .land-top .brand { color: var(--text); border-bottom: none; }
@@ -693,6 +763,7 @@
 }
 
 .land-nav a {
+  position: relative;
   color: var(--text-2);
   font-size: 13.5px;
   padding: 7px 12px;
@@ -701,6 +772,22 @@
   transition: background 0.15s, color 0.15s;
 }
 .land-nav a:hover { background: rgba(255, 255, 255, 0.78); color: var(--text); }
+
+/* an accent rule draws in under the active anchor */
+.land-nav a::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  height: 1.5px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.26s var(--ease);
+}
+.land-nav a:hover::after { transform: scaleX(1); }
+
 
 .land-top-right {
   display: flex;
@@ -722,6 +809,15 @@
   z-index: 1;
   max-width: 780px;
 }
+
+/* the hero types itself in, line by line */
+.land-hero-inner > * { animation: rise 0.7s var(--ease) both; }
+.land-hero-inner > *:nth-child(1) { animation-delay: 0.06s; }
+.land-hero-inner > *:nth-child(2) { animation-delay: 0.14s; }
+.land-hero-inner > *:nth-child(3) { animation-delay: 0.24s; }
+.land-hero-inner > *:nth-child(4) { animation-delay: 0.34s; }
+.land-hero-inner > *:nth-child(5) { animation-delay: 0.44s; }
+
 
 .land-title {
   font-family: var(--serif);
@@ -818,6 +914,22 @@
   padding: 24px;
   border-top: 2px solid var(--text);
 }
+
+/* per-property delays keep the stagger on the reveal only — hover stays instant */
+.reveal-ready .land-card {
+  transition:
+    opacity 0.6s var(--ease) var(--d, 0ms),
+    transform 0.6s var(--ease) var(--d, 0ms),
+    translate 0.2s var(--ease),
+    box-shadow 0.2s var(--ease),
+    border-color 0.2s var(--ease);
+}
+.land-card:hover {
+  translate: 0 -3px;
+  box-shadow: var(--shadow-sm);
+  border-color: var(--line-2);
+}
+
 
 .land-card-n {
   font-family: var(--mono);
