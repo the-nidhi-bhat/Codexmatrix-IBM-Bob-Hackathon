@@ -3,7 +3,7 @@
 
 **Author:** Arati (Legacy Analysis + Execution Planning role) — IBM Bob IDE  
 **Branch:** `arati/risk-analysis`  
-**Input documents:** [`ASSESS.md`](../../ASSESS.md) · [`PLAN.md`](../../PLAN.md) · [`ASSESS-ARATI.md`](./ASSESS-ARATI.md)  
+**Input documents:** [`ASSESS.md`](../../../ASSESS.md) · [`PLAN.md`](../../../PLAN.md) · [`ASSESS-ARATI.md`](./ASSESS-ARATI.md)\
 **Safety net:** 18 tests across 3 suites — must remain green after every step  
 **Baseline runtime:** Node.js 6.17.1 (Steps 1–5); Node.js 20 LTS (Steps 6–7)
 
