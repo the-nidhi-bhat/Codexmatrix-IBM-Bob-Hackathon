@@ -45,6 +45,28 @@
   --purple: #5b5a8f;
   --blue-soft: #e9eef4;
 
+  /* state hairlines — tokens so dark mode can re-value them */
+  --line-red: #efd2cf;
+  --line-yellow: #eddfba;
+  --line-green: #cfe2d7;
+  --line-accent: #cbe3df;
+  --line-blue: #d5dee8;
+  --text-blue: #40566d;
+
+  /* ink on solid fills + form affordances */
+  --on-solid: #fbfaf7;
+  --solid-hover: #000000;
+  --outline-hover: #ffffff;
+  --on-accent: #ffffff;
+  --placeholder: #a9a398;
+
+  /* translucent chrome */
+  --header-bg: rgba(250, 249, 246, 0.92);
+  --header-bg-land: rgba(250, 249, 246, 0.94);
+  --rail-bg: rgba(242, 240, 234, 0.88);
+  --hover-bg: rgba(255, 255, 255, 0.6);
+  --hover-bg-strong: rgba(255, 255, 255, 0.78);
+
   /* legacy aliases kept so data files stay in sync */
   --bg: var(--paper);
   --surface: var(--card);
@@ -79,6 +101,81 @@
     linear-gradient(to right, rgba(27, 26, 23, 0.036) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(27, 26, 23, 0.036) 1px, transparent 1px);
   --graph-size: auto, 96px 96px, 96px 96px, 16px 16px, 16px 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Dark mode — the same tokens, re-valued. No component branches
+   on the theme, so light stays byte-for-byte what it was.
+   ══════════════════════════════════════════════════════════════ */
+
+[data-theme="dark"] {
+  /* ground */
+  --paper: #1a1917;
+  --rail: #201f1c;
+  --card: #232220;
+  --sunk: #1e1d1b;
+
+  /* rules */
+  --line: #34312c;
+  --line-2: #45413a;
+
+  /* ink */
+  --text: #edeae3;
+  --text-2: #b6b0a5;
+  --muted: #918b80;
+
+  /* one accent */
+  --accent: #57b8ae;
+  --accent-ink: #86d4cb;
+  --accent-soft: #14312e;
+
+  /* states */
+  --green: #74c497;
+  --green-soft: #16301f;
+  --yellow: #d9a83e;
+  --yellow-soft: #332714;
+  --red: #f0776d;
+  --red-soft: #351a19;
+  --purple: #a09edb;
+  --blue-soft: #1b2430;
+
+  --line-red: #4c2723;
+  --line-yellow: #463818;
+  --line-green: #244030;
+  --line-accent: #1e403c;
+  --line-blue: #2b3542;
+  --text-blue: #a2b6cc;
+
+  --on-solid: #1a1917;
+  --solid-hover: #ffffff;
+  --outline-hover: #2c2b28;
+  --on-accent: #10201e;
+  --placeholder: #6d675e;
+
+  --header-bg: rgba(26, 25, 23, 0.92);
+  --header-bg-land: rgba(26, 25, 23, 0.94);
+  --rail-bg: rgba(32, 31, 28, 0.9);
+  --hover-bg: rgba(255, 255, 255, 0.05);
+  --hover-bg-strong: rgba(255, 255, 255, 0.07);
+
+  /* elevation reads flatter on a dark page */
+  --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.42);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.46), 0 2px 6px -3px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.46), 0 10px 28px -16px rgba(0, 0, 0, 0.85);
+
+  /* the grid is drawn in ink — flip it to chalk */
+  --graph:
+    radial-gradient(1240px 660px at 16% -14%, rgba(87, 184, 174, 0.07), transparent 62%),
+    linear-gradient(to right, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+}
+
+/* artwork that is drawn in ink gets flipped instead of being redrawn */
+[data-theme="dark"] .tex { filter: invert(1) hue-rotate(180deg); }
+[data-theme="dark"] [data-testid="architecture-diagram"] svg {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 html {
@@ -292,10 +389,10 @@ h1, h2, h3, h4 {
 /* solid ink — the one primary action on a view */
 .btn-solid {
   background: var(--text);
-  color: #fbfaf7;
+  color: var(--on-solid);
   box-shadow: var(--shadow-xs);
 }
-.btn-solid:hover:not(:disabled) { background: #000; }
+.btn-solid:hover:not(:disabled) { background: var(--solid-hover); }
 
 .btn-outline {
   background: var(--card);
@@ -303,7 +400,7 @@ h1, h2, h3, h4 {
   color: var(--text);
   box-shadow: var(--shadow-xs);
 }
-.btn-outline:hover:not(:disabled) { border-color: var(--muted); background: #fff; }
+.btn-outline:hover:not(:disabled) { border-color: var(--muted); background: var(--outline-hover); }
 
 .btn-quiet {
   background: transparent;
@@ -321,7 +418,7 @@ h1, h2, h3, h4 {
 
 .btn-accent {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn-accent:hover:not(:disabled) { background: var(--accent-ink); }
 
@@ -359,11 +456,11 @@ h1, h2, h3, h4 {
   border: 1px solid var(--line);
 }
 
-.tag-high   { background: var(--red-soft);    color: var(--red);    border-color: #efd2cf; }
-.tag-medium { background: var(--yellow-soft); color: var(--yellow); border-color: #eddfba; }
-.tag-low    { background: var(--blue-soft);   color: #40566d;       border-color: #d5dee8; }
-.tag-green  { background: var(--green-soft);  color: var(--green);  border-color: #cfe2d7; }
-.tag-accent { background: var(--accent-soft); color: var(--accent-ink); border-color: #cbe3df; }
+.tag-high   { background: var(--red-soft);    color: var(--red);    border-color: var(--line-red); }
+.tag-medium { background: var(--yellow-soft); color: var(--yellow); border-color: var(--line-yellow); }
+.tag-low    { background: var(--blue-soft);   color: var(--text-blue); border-color: var(--line-blue); }
+.tag-green  { background: var(--green-soft);  color: var(--green);  border-color: var(--line-green); }
+.tag-accent { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--line-accent); }
 
 /* status dot + label */
 .status {
@@ -397,10 +494,10 @@ h1, h2, h3, h4 {
   background-size: 200px 200px;
   padding: 16px 18px;
 }
-.note-ok      { background-color: var(--green-soft);  border-color: #cfe2d7; }
-.note-warn    { background-color: var(--yellow-soft); border-color: #eddfba; }
-.note-danger  { background-color: var(--red-soft);    border-color: #efd2cf; }
-.note-accent  { background-color: var(--accent-soft); border-color: #cbe3df; }
+.note-ok      { background-color: var(--green-soft);  border-color: var(--line-green); }
+.note-warn    { background-color: var(--yellow-soft); border-color: var(--line-yellow); }
+.note-danger  { background-color: var(--red-soft);    border-color: var(--line-red); }
+.note-accent  { background-color: var(--accent-soft); border-color: var(--line-accent); }
 
 .note-title {
   font-weight: 650;
@@ -529,7 +626,7 @@ h1, h2, h3, h4 {
   box-shadow: var(--shadow-xs);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.input::placeholder { color: #a9a398; }
+.input::placeholder { color: var(--placeholder); }
 .input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);

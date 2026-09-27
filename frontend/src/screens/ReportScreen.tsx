@@ -87,7 +87,7 @@ export default function ReportScreen() {
                 style={{
                   padding: "16px 18px",
                   background: isAfter ? "var(--green-soft)" : "var(--sunk)",
-                  borderColor: isAfter ? "#cfe2d7" : "var(--line)",
+                  borderColor: isAfter ? "var(--line-green)" : "var(--line)",
                 }}
               >
                 <div

@@ -1,6 +1,7 @@
 import { useRef, type CSSProperties } from "react";
 import { DiffTexture } from "../Texture";
 import { useReveal } from "../useReveal";
+import ThemeToggle from "../ThemeToggle";
 import "../App.css";
 
 interface LandingScreenProps {
@@ -121,6 +122,7 @@ export default function LandingScreen({ onAnalyze }: LandingScreenProps) {
         <div className="land-top-right">
           <span className="eyebrow">IBM Bob 2.0 · Team Codexmatrix</span>
           <span className="demo-chip">demo</span>
+          <ThemeToggle />
           <button className="btn btn-solid" onClick={onAnalyze}>
             Analyze a repository
           </button>

@@ -184,7 +184,7 @@ export default function RollbackScreen() {
                 {rb.expectedValue}
               </div>
             </div>
-            <div className="note note-danger" style={{ padding: "13px 16px", background: "#fff", borderColor: "#efd2cf" }}>
+            <div className="note note-danger" style={{ padding: "13px 16px", background: "var(--card)", borderColor: "var(--line-red)" }}>
               <div className="stat-label" style={{ marginTop: 0 }}>Received</div>
               <div className="mono" style={{ color: "var(--red)", fontSize: 16, fontWeight: 600, marginTop: 6 }}>
                 {rb.receivedValue}
@@ -198,7 +198,7 @@ export default function RollbackScreen() {
               marginTop: 14,
               padding: "12px 15px",
               background: "var(--card)",
-              border: "1px solid #efd2cf",
+              border: "1px solid var(--line-red)",
               borderRadius: 8,
               color: "var(--text-2)",
               fontSize: 12,

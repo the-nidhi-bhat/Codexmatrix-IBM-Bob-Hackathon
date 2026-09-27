@@ -7,7 +7,7 @@ const LEVEL_ORDER: RiskLevel[] = ["high", "medium", "low"];
 const LEVEL_COLOR: Record<RiskLevel, string> = {
   high: "var(--red)",
   medium: "var(--yellow)",
-  low: "#40566d",
+  low: "var(--text-blue)",
 };
 
 function RiskCard({ item, expanded, onToggle }: {
@@ -61,7 +61,7 @@ function RiskCard({ item, expanded, onToggle }: {
 
           <div>
             <div className="section-title">Blast radius / evidence</div>
-            <div className="panel" style={{ padding: "13px 16px", background: "var(--red-soft)", borderColor: "#efd2cf" }}>
+            <div className="panel" style={{ padding: "13px 16px", background: "var(--red-soft)", borderColor: "var(--line-red)" }}>
               <div style={{ fontWeight: 600, color: "var(--red)", marginBottom: 5, fontSize: 13 }}>
                 {item.blastRadius}
               </div>

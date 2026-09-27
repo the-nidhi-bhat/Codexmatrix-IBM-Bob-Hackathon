@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DiffTexture } from "../Texture";
+import ThemeToggle from "../ThemeToggle";
 import "../App.css";
 
 interface StartScreenProps {
@@ -91,6 +92,7 @@ export default function StartScreen({
         <div className="start-top-right">
           <span className="eyebrow">IBM Bob 2.0 · Team Codexmatrix</span>
           <span className="demo-chip">demo</span>
+          <ThemeToggle />
         </div>
       </div>
 

@@ -98,7 +98,7 @@
   align-items: center;
   gap: 18px;
   padding: 0 26px;
-  background: rgba(250, 249, 246, 0.92);
+  background: var(--header-bg);
   backdrop-filter: saturate(1.4) blur(8px);
   border-bottom: 1px solid var(--line);
 }
@@ -115,7 +115,7 @@
   height: 26px;
   border-radius: 7px;
   background: var(--text);
-  color: #fbfaf7;
+  color: var(--on-solid);
   display: grid;
   place-items: center;
   font-family: var(--serif);
@@ -195,11 +195,11 @@
   background: var(--muted);
 }
 .safety-pill.is-ok::before     { background: var(--green); }
-.safety-pill.is-ok             { color: var(--green); border-color: #cfe2d7; background: var(--green-soft); }
+.safety-pill.is-ok             { color: var(--green); border-color: var(--line-green); background: var(--green-soft); }
 .safety-pill.is-run::before    { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
-.safety-pill.is-run            { color: var(--yellow); border-color: #eddfba; background: var(--yellow-soft); }
+.safety-pill.is-run            { color: var(--yellow); border-color: var(--line-yellow); background: var(--yellow-soft); }
 .safety-pill.is-fail::before   { background: var(--red); }
-.safety-pill.is-fail           { color: var(--red); border-color: #efd2cf; background: var(--red-soft); }
+.safety-pill.is-fail           { color: var(--red); border-color: var(--line-red); background: var(--red-soft); }
 
 /* ── body shell ───────────────────────────────────────────────── */
 
@@ -220,7 +220,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background: rgba(242, 240, 234, 0.88);
+  background: var(--rail-bg);
   border-right: 1px solid var(--line);
   padding: 26px 0 18px;
 }
@@ -248,7 +248,7 @@
   border-left: 2px solid transparent;
   transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.nav-item:hover { background: rgba(255, 255, 255, 0.6); color: var(--text); }
+.nav-item:hover { background: var(--hover-bg); color: var(--text); }
 
 .nav-item.is-active {
   background: var(--card);
@@ -353,7 +353,7 @@
   align-items: flex-start;
   gap: 10px;
   background: var(--red-soft);
-  border: 1px solid #efd2cf;
+  border: 1px solid var(--line-red);
   border-left: 3px solid var(--red);
   border-radius: var(--radius-sm);
   padding: 12px 16px;
@@ -420,9 +420,21 @@
   padding: 3px 9px;
   border-radius: 4px;
   background: var(--yellow-soft);
-  border: 1px solid #eddfba;
+  border: 1px solid var(--line-yellow);
   color: var(--yellow);
 }
+
+/* compact light / dark switch — lives in every top header */
+.theme-toggle {
+  gap: 6px;
+  padding: 6px 11px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text-2);
+  box-shadow: var(--shadow-xs);
+}
+.theme-toggle .theme-glyph { font-size: 13px; line-height: 1; }
 
 .start-body {
   position: relative;
@@ -747,7 +759,7 @@
   align-items: center;
   gap: 30px;
   padding: 0 32px;
-  background: rgba(250, 249, 246, 0.94);
+  background: var(--header-bg-land);
   -webkit-backdrop-filter: saturate(1.35) blur(8px);
   backdrop-filter: saturate(1.35) blur(8px);
   border-bottom: 1px solid var(--line);
@@ -771,7 +783,7 @@
   border-bottom: none;
   transition: background 0.15s, color 0.15s;
 }
-.land-nav a:hover { background: rgba(255, 255, 255, 0.78); color: var(--text); }
+.land-nav a:hover { background: var(--hover-bg-strong); color: var(--text); }
 
 /* an accent rule draws in under the active anchor */
 .land-nav a::after {
@@ -1024,7 +1036,7 @@
   place-items: center;
   border-radius: 999px;
   background: var(--green-soft);
-  border: 1px solid #cfe2d7;
+  border: 1px solid var(--line-green);
   color: var(--green);
   font-size: 12px;
   font-weight: 700;
@@ -1050,7 +1062,7 @@
   background-color: var(--accent-soft);
   background-image: var(--grain);
   background-size: 200px 200px;
-  border-bottom: 1px solid #cbe3df;
+  border-bottom: 1px solid var(--line-accent);
 }
 
 .land-final-inner {
@@ -1116,7 +1128,8 @@
   .land-lede { font-size: 16px; }
   .land-cta { gap: 16px; }
   .land-cta .btn { width: 100%; }
-  .land-top-right .btn { display: none; }
+  .land-top-right .btn-solid { display: none; }
+  .theme-toggle .theme-label { display: none; }
   .land-stage-t::after { content: none; }
   .land-final-inner .btn { width: 100%; }
 }

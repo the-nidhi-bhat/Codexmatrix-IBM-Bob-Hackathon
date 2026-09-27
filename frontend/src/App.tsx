@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import LandingScreen from "./screens/LandingScreen";
+import ThemeToggle from "./ThemeToggle";
 import StartScreen from "./screens/StartScreen";
 import ArchitectureScreen from "./screens/ArchitectureScreen";
 import OverviewScreen from "./screens/OverviewScreen";
@@ -128,6 +129,7 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
             <span className="phase-val">{PHASE_LABELS[active]}</span>
           </span>
           <span className={pill.className} title={pillTitle}>{pillTitle}</span>
+          <ThemeToggle />
           <button className="btn btn-quiet" onClick={onChangeRepo}>← Change repo</button>
         </div>
       </header>

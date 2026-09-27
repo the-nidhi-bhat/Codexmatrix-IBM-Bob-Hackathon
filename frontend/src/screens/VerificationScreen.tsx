@@ -147,7 +147,7 @@ export default function VerificationScreen({ onRollback, onRunVerification }: { 
                         marginTop: 7,
                         padding: "8px 11px",
                         background: "var(--card)",
-                        border: "1px solid #efd2cf",
+                        border: "1px solid var(--line-red)",
                         borderRadius: 6,
                         fontSize: 11.5,
                         color: "var(--red)",
