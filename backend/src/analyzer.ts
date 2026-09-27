@@ -25,6 +25,8 @@ import type {
   ActivityLogEntry,
   AuditEntry,
   WorkflowPhase,
+  ProjectStructureEntry,
+  RepositoryArchitecture,
 } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -49,12 +51,28 @@ function existsInDir(dir: string, name: string): boolean {
   return fs.existsSync(path.join(dir, name));
 }
 
+function filesNamedRecursive(dir: string, name: string, results: string[] = []): string[] {
+  let entries: fs.Dirent[] = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return results; }
+  for (const entry of entries) {
+    if (entry.name.startsWith(".") || ["node_modules", "vendor", "target", "dist", "build", "coverage", ".venv", "venv"].includes(entry.name)) continue;
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) filesNamedRecursive(fullPath, name, results);
+    else if (entry.isFile() && entry.name === name) results.push(fullPath);
+  }
+  return results;
+}
+
+function hasFileNamedRecursive(dir: string, name: string): boolean {
+  return filesNamedRecursive(dir, name).length > 0;
+}
+
 function countFilesRecursive(dir: string, exts: string[]): number {
   let count = 0;
   try {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const e of entries) {
-      if (e.name === "node_modules" || e.name === ".git") continue;
+      if (["node_modules", ".git", "vendor", ".venv", "venv", "target", "build", "dist"].includes(e.name)) continue;
       const full = path.join(dir, e.name);
       if (e.isDirectory()) {
         count += countFilesRecursive(full, exts);
@@ -73,7 +91,7 @@ function listFilesRecursive(dir: string, exts: string[], max = 200): string[] {
     try {
       const entries = fs.readdirSync(d, { withFileTypes: true });
       for (const e of entries) {
-        if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor") continue;
+        if (["node_modules", ".git", "vendor", ".venv", "venv", "target", "build", "dist"].includes(e.name)) continue;
         const full = path.join(d, e.name);
         if (e.isDirectory()) {
           walk(full);
@@ -88,14 +106,14 @@ function listFilesRecursive(dir: string, exts: string[], max = 200): string[] {
 }
 
 function linesOfCodeEstimate(dir: string): number {
-  const CODE_EXTS = [".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".go", ".rs",
-                     ".rb", ".php", ".c", ".cpp", ".cs", ".swift", ".kt"];
+  const CODE_EXTS = [".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx", ".py", ".java", ".go", ".rs",
+                     ".rb", ".php", ".c", ".h", ".cpp", ".hpp", ".cs", ".swift", ".kt", ".sql", ".sh", ".vue", ".svelte"];
   let total = 0;
   function walk(d: string) {
     try {
       const entries = fs.readdirSync(d, { withFileTypes: true });
       for (const e of entries) {
-        if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor") continue;
+        if (["node_modules", ".git", "vendor", ".venv", "venv", "target", "build", "dist"].includes(e.name)) continue;
         const full = path.join(d, e.name);
         if (e.isDirectory()) { walk(full); continue; }
         if (CODE_EXTS.some(ext => e.name.endsWith(ext))) {
@@ -121,113 +139,169 @@ interface DetectedStack {
 }
 
 function detectStack(dir: string): DetectedStack {
-  const langs: string[] = [];
-  const pkg = readFileSafe(path.join(dir, "package.json"));
-  let pkgJson: Record<string, unknown> | null = null;
-  try { pkgJson = JSON.parse(pkg); } catch { /* not valid JSON */ }
+  const extensions: Array<[string, string]> = [
+    [".js", "JavaScript"], [".mjs", "JavaScript"], [".cjs", "JavaScript"],
+    [".ts", "TypeScript"], [".tsx", "TypeScript"], [".jsx", "JavaScript"],
+    [".py", "Python"], [".java", "Java"], [".kt", "Kotlin"], [".go", "Go"],
+    [".rs", "Rust"], [".rb", "Ruby"], [".php", "PHP"], [".cs", "C#"],
+    [".c", "C"], [".cpp", "C++"], [".swift", "Swift"],
+  ];
+  const langs = [...new Set(extensions.filter(([ext]) => countFilesRecursive(dir, [ext]) > 0).map(([, language]) => language))];
+  const packageFiles = filesNamedRecursive(dir, "package.json");
+  const packageManifests: Array<Record<string, unknown>> = [];
+  for (const file of packageFiles) {
+    try { packageManifests.push(JSON.parse(readFileSafe(file)) as Record<string, unknown>); } catch { /* ignore invalid nested manifests */ }
+  }
+  if (packageFiles.length && !langs.includes("JavaScript") && !langs.includes("TypeScript")) langs.push("JavaScript");
+  const dependencies: Record<string, string> = {};
+  for (const manifest of packageManifests) {
+    Object.assign(dependencies,
+      typeof manifest.dependencies === "object" && manifest.dependencies ? manifest.dependencies as Record<string, string> : {},
+      typeof manifest.devDependencies === "object" && manifest.devDependencies ? manifest.devDependencies as Record<string, string> : {});
+  }
+  const pythonManifests = ["requirements.txt", "pyproject.toml", "setup.py", "setup.cfg", "Pipfile"].flatMap((file) => filesNamedRecursive(dir, file));
+  if (pythonManifests.length && !langs.includes("Python")) langs.push("Python");
+  const pythonConfig = pythonManifests.map(readFileSafe).join("\n").toLowerCase();
+  const composer = filesNamedRecursive(dir, "composer.json").map(readFileSafe).join("\n").toLowerCase();
+  let framework = "not detected";
+  let runtime = "not detected";
+  let packageManager = "not detected";
+  let projectType = "not detected";
 
-  let framework = "unknown";
-  let runtime = "unknown";
-  let packageManager = "unknown";
-  let projectType = "unknown";
-
-  // JavaScript / TypeScript / Node.js
-  if (existsInDir(dir, "package.json")) {
-    langs.push("JavaScript");
-    if (existsInDir(dir, "tsconfig.json") || countFilesRecursive(dir, [".ts", ".tsx"]) > 0) {
-      langs.push("TypeScript");
-    }
-    packageManager = existsInDir(dir, "yarn.lock") ? "yarn"
-      : existsInDir(dir, "pnpm-lock.yaml") ? "pnpm" : "npm";
-
-    // Detect Node runtime version
-    const nvmrc = readFileSafe(path.join(dir, ".nvmrc")).trim();
-    const engines = pkgJson?.engines as Record<string, string> | undefined;
-    if (nvmrc) runtime = `Node.js ${nvmrc}`;
-    else if (engines?.node) runtime = `Node.js ${engines.node}`;
-    else runtime = "Node.js (version unspecified)";
-
-    // Framework detection
-    const deps: Record<string, string> = {
-      ...(pkgJson?.dependencies as Record<string, string> || {}),
-      ...(pkgJson?.devDependencies as Record<string, string> || {}),
-    };
-    if (deps["next"]) framework = "Next.js";
-    else if (deps["nuxt"]) framework = "Nuxt.js";
-    else if (deps["@nestjs/core"]) framework = "NestJS";
-    else if (deps["express"]) framework = `Express ${deps["express"].replace(/[\^~]/, "")}`;
-    else if (deps["fastify"]) framework = "Fastify";
-    else if (deps["koa"]) framework = "Koa";
-    else if (deps["hapi"] || deps["@hapi/hapi"]) framework = "Hapi";
-    else if (deps["react"]) framework = "React";
-    else if (deps["vue"]) framework = "Vue.js";
-    else if (deps["@angular/core"]) framework = "Angular";
-    else if (deps["svelte"]) framework = "Svelte";
-
-    projectType = deps["express"] || deps["fastify"] || deps["koa"] ? "web-api"
-      : deps["react"] || deps["vue"] || deps["@angular/core"] ? "spa"
-      : deps["next"] || deps["nuxt"] ? "fullstack"
-      : "node-app";
+  const jsEngines = packageManifests.map((manifest) => manifest.engines as Record<string, string> | undefined).find((engines) => engines?.node);
+  const jsRuntime = readFileSafe(path.join(dir, ".nvmrc")).trim() || jsEngines?.node;
+  if (langs.includes("JavaScript") || langs.includes("TypeScript") || packageFiles.length > 0) {
+    runtime = jsRuntime ? `Node.js ${jsRuntime}` : "Node.js (version not specified)";
+    const declaredManager = packageManifests.map((manifest) => typeof manifest.packageManager === "string" ? manifest.packageManager.split("@")[0] : "").find(Boolean);
+    packageManager = hasFileNamedRecursive(dir, "pnpm-lock.yaml") || declaredManager === "pnpm" ? "pnpm"
+      : hasFileNamedRecursive(dir, "yarn.lock") || declaredManager === "yarn" ? "yarn"
+      : hasFileNamedRecursive(dir, "bun.lock") || hasFileNamedRecursive(dir, "bun.lockb") || declaredManager === "bun" ? "bun"
+      : hasFileNamedRecursive(dir, "package-lock.json") || hasFileNamedRecursive(dir, "npm-shrinkwrap.json") || packageFiles.length > 0 ? "npm"
+      : "not detected";
+    const frameworks: Array<[string, string]> = [
+      ["next", "Next.js"], ["nuxt", "Nuxt.js"], ["@nestjs/core", "NestJS"],
+      ["express", `Express${dependencies.express ? ` ${dependencies.express.replace(/[\^~]/, "")}` : ""}`],
+      ["fastify", "Fastify"], ["koa", "Koa"], ["@hapi/hapi", "Hapi"],
+      ["react", "React"], ["vue", "Vue.js"], ["@angular/core", "Angular"], ["svelte", "Svelte"],
+    ];
+    const detectedFrameworks = frameworks.filter(([name]) => dependencies[name]).map(([, name]) => name);
+    framework = detectedFrameworks.length ? [...new Set(detectedFrameworks)].join(" + ") : framework;
+    projectType = packageFiles.length > 1 ? "JavaScript/TypeScript monorepo"
+      : dependencies.express || dependencies.fastify || dependencies.koa ? "web-api"
+      : dependencies.react || dependencies.vue || dependencies["@angular/core"] ? "spa"
+      : dependencies.next || dependencies.nuxt ? "fullstack" : "Node.js application";
   }
 
-  // Python
-  if (existsInDir(dir, "requirements.txt") || existsInDir(dir, "pyproject.toml") ||
-      existsInDir(dir, "setup.py") || existsInDir(dir, "setup.cfg")) {
-    langs.push("Python");
-    packageManager = existsInDir(dir, "poetry.lock") ? "poetry"
-      : existsInDir(dir, "Pipfile") ? "pipenv" : "pip";
-    runtime = "Python";
-    projectType = "python-app";
-    const req = readFileSafe(path.join(dir, "requirements.txt"));
-    if (req.includes("django")) framework = "Django";
-    else if (req.includes("flask")) framework = "Flask";
-    else if (req.includes("fastapi")) framework = "FastAPI";
+  if (pythonManifests.length > 0 || langs.includes("Python")) {
+    runtime = readFileSafe(path.join(dir, ".python-version")).trim() || "Python (version not specified)";
+    packageManager = hasFileNamedRecursive(dir, "poetry.lock") ? "Poetry"
+      : hasFileNamedRecursive(dir, "uv.lock") ? "uv"
+      : hasFileNamedRecursive(dir, "Pipfile") ? "Pipenv" : "pip";
+    framework = pythonConfig.includes("django") ? "Django"
+      : pythonConfig.includes("fastapi") ? "FastAPI"
+      : pythonConfig.includes("flask") ? "Flask" : framework;
+    projectType = "Python application";
   }
 
-  // Java / Kotlin
-  if (existsInDir(dir, "pom.xml")) {
-    langs.push("Java"); packageManager = "Maven"; runtime = "JVM"; projectType = "java-app";
-    const pom = readFileSafe(path.join(dir, "pom.xml"));
-    if (pom.includes("spring-boot")) framework = "Spring Boot";
-  }
-  if (existsInDir(dir, "build.gradle") || existsInDir(dir, "build.gradle.kts")) {
-    if (!langs.includes("Java")) langs.push("Java");
-    packageManager = "Gradle"; runtime = "JVM"; projectType = "java-app";
-  }
-
-  // Go
-  if (existsInDir(dir, "go.mod")) {
-    langs.push("Go"); runtime = "Go"; packageManager = "go modules"; projectType = "go-app";
-    const goMod = readFileSafe(path.join(dir, "go.mod"));
-    if (goMod.includes("gin-gonic")) framework = "Gin";
-    else if (goMod.includes("echo")) framework = "Echo";
+  if (hasFileNamedRecursive(dir, "pom.xml") || hasFileNamedRecursive(dir, "build.gradle") || hasFileNamedRecursive(dir, "build.gradle.kts")) {
+    if (!langs.includes("Java") && !langs.includes("Kotlin")) langs.push("Java");
+    const pom = filesNamedRecursive(dir, "pom.xml").map(readFileSafe).join("\n");
+    const javaVersion = pom.match(/<maven\.compiler\.(?:release|source)>\s*([^<]+)\s*</)?.[1]
+      ?? pom.match(/<java\.version>\s*([^<]+)\s*</)?.[1];
+    runtime = javaVersion ? `JVM ${javaVersion.trim()}` : "JVM (version not specified)";
+    packageManager = hasFileNamedRecursive(dir, "pom.xml") ? "Maven" : "Gradle";
+    framework = pom.toLowerCase().includes("spring-boot") ? "Spring Boot" : framework;
+    projectType = "JVM application";
   }
 
-  // Rust
-  if (existsInDir(dir, "Cargo.toml")) {
-    langs.push("Rust"); runtime = "Rust"; packageManager = "cargo"; projectType = "rust-app";
+  if (hasFileNamedRecursive(dir, "go.mod")) {
+    if (!langs.includes("Go")) langs.push("Go");
+    const goMod = filesNamedRecursive(dir, "go.mod").map(readFileSafe).join("\n");
+    runtime = `Go${goMod.match(/^go\s+([^\r\n]+)/m)?.[1] ? ` ${goMod.match(/^go\s+([^\r\n]+)/m)?.[1]}` : ""}`;
+    packageManager = "Go modules";
+    framework = goMod.includes("gin-gonic/gin") ? "Gin" : goMod.includes("labstack/echo") ? "Echo" : framework;
+    projectType = "Go application";
   }
-
-  // Ruby
-  if (existsInDir(dir, "Gemfile")) {
-    langs.push("Ruby"); runtime = "Ruby"; packageManager = "bundler"; projectType = "ruby-app";
-    const gemfile = readFileSafe(path.join(dir, "Gemfile"));
-    if (gemfile.includes("rails")) framework = "Rails";
-    else if (gemfile.includes("sinatra")) framework = "Sinatra";
+  if (hasFileNamedRecursive(dir, "Cargo.toml")) {
+    if (!langs.includes("Rust")) langs.push("Rust");
+    runtime = "Rust"; packageManager = "Cargo"; projectType = "Rust application";
   }
-
-  // PHP
-  if (existsInDir(dir, "composer.json")) {
-    langs.push("PHP"); runtime = "PHP"; packageManager = "composer"; projectType = "php-app";
+  if (hasFileNamedRecursive(dir, "Gemfile")) {
+    if (!langs.includes("Ruby")) langs.push("Ruby");
+    const gemfile = filesNamedRecursive(dir, "Gemfile").map(readFileSafe).join("\n").toLowerCase();
+    runtime = "Ruby"; packageManager = "Bundler"; projectType = "Ruby application";
+    framework = gemfile.includes("rails") ? "Rails" : gemfile.includes("sinatra") ? "Sinatra" : framework;
   }
-
+  if (hasFileNamedRecursive(dir, "composer.json")) {
+    if (!langs.includes("PHP")) langs.push("PHP");
+    runtime = "PHP"; packageManager = "Composer"; projectType = "PHP application";
+    framework = composer.includes("laravel/framework") ? "Laravel" : composer.includes("symfony/") ? "Symfony" : framework;
+  }
   return {
-    languages: langs.length ? langs : ["unknown"],
-    primaryLanguage: langs[0] ?? "unknown",
+    languages: langs,
+    primaryLanguage: langs[0] ?? "not detected",
     framework,
     runtime,
     packageManager,
     projectType,
+  };
+}
+
+const SOURCE_EXTENSIONS = [".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".py", ".java", ".kt", ".go", ".rs", ".rb", ".php", ".cs", ".c", ".cpp", ".swift", ".html", ".css", ".scss", ".vue", ".svelte", ".sh", ".sql"];
+const ROOT_MANIFESTS = ["package.json", "pyproject.toml", "requirements.txt", "pom.xml", "build.gradle", "build.gradle.kts", "go.mod", "Cargo.toml", "Gemfile", "composer.json", "README.md"];
+
+function collectProjectStructure(dir: string): ProjectStructureEntry[] {
+  const result: ProjectStructureEntry[] = [];
+  let entries: fs.Dirent[] = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return result; }
+
+  for (const entry of entries) {
+    if (entry.name.startsWith(".") || ["node_modules", "vendor", "target", "dist", "build", "coverage"].includes(entry.name)) continue;
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const files = countFilesRecursive(fullPath, SOURCE_EXTENSIONS);
+      if (files > 0) result.push({ path: `${entry.name}/`, kind: "directory", files });
+    } else if (ROOT_MANIFESTS.includes(entry.name)) {
+      result.push({ path: entry.name, kind: "file", files: 1 });
+    } else if (SOURCE_EXTENSIONS.some((extension) => entry.name.endsWith(extension))) {
+      result.push({ path: entry.name, kind: "file", files: 1 });
+    }
+  }
+  return result.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function buildArchitecture(structure: ProjectStructureEntry[]): RepositoryArchitecture {
+  const sourceDirectories = structure.filter((entry) => entry.kind === "directory");
+  const rootSources = structure.filter((entry) => entry.kind === "file" && SOURCE_EXTENSIONS.some((extension) => entry.path.endsWith(extension)));
+  if (sourceDirectories.length === 0 && rootSources.length === 0) {
+    return {
+      available: false,
+      summary: "Architecture unavailable: no source directories were detected.",
+      diagram: null,
+      components: [],
+    };
+  }
+
+  const components = sourceDirectories.length > 0
+    ? sourceDirectories
+    : [{ path: ".", kind: "directory" as const, files: rootSources.length }];
+  const labels = components.map((component) => component.path.replace(/[^a-zA-Z0-9_./ -]/g, "").replace(/"/g, "").trim());
+  const nodes = labels.map((label, index) => `  C${index}["${label} (${components[index].files} source files)"]`);
+  const edges = labels.map((_label, index) => `  ROOT --> C${index}`);
+  const diagram = [
+    "flowchart LR",
+    "  ROOT[\"Repository root\"]",
+    ...nodes,
+    ...edges,
+  ].join("\n");
+
+  return {
+    available: true,
+    summary: sourceDirectories.length > 0
+      ? `Repository structure detected from ${components.length} source director${components.length === 1 ? "y" : "ies"}. Connections show directory containment only.`
+      : `Repository root contains ${rootSources.length} source files; no internal source directories were detected.`,
+    diagram,
+    components,
   };
 }
 
@@ -393,15 +467,7 @@ function assessRisks(dir: string, stack: DetectedStack): RiskFinding[] {
     });
   }
 
-  return findings.length ? findings : [{
-    id: "r1", level: "low",
-    title: "No significant risks detected",
-    file: "project root",
-    reason: "Static analysis did not find common risk patterns for this repository type.",
-    opportunity: "Review manually for domain-specific modernization opportunities.",
-    blastRadius: "n/a",
-    evidence: `Repository type: ${stack.projectType}`,
-  }];
+  return findings;
 }
 
 // ── Plan generation ───────────────────────────────────────────────────────────
@@ -413,11 +479,10 @@ function buildPlan(risks: RiskFinding[], stack: DetectedStack, dir: string): Pla
   // Always first: capture existing state
   steps.push({
     id: stepId++,
-    title: "Capture baseline commit and document current state",
-    description: "Record the starting commit SHA and generate a summary of the repository state before any changes.",
+    title: "Record analyzed baseline commit",
+    description: "The repository HEAD was recorded during analysis. No source files were changed.",
     status: "passed",
-    filesAffected: ["README.md", "package.json"],
-    testsDelta: "baseline recorded",
+    filesAffected: [],
     risk: "low",
     expectedImpact: "Provides a clear rollback target; establishes audit trail starting point.",
   });
@@ -458,6 +523,7 @@ function buildPlan(risks: RiskFinding[], stack: DetectedStack, dir: string): Pla
       filesAffected: [r.file],
       risk: "low",
       expectedImpact: r.reason,
+      ...(r.title === "No README found" ? { operationId: "create-analysis-readme" } : {}),
     });
   }
 
@@ -469,8 +535,8 @@ function buildPlan(risks: RiskFinding[], stack: DetectedStack, dir: string): Pla
   if (hasTests) {
     steps.push({
       id: stepId++,
-      title: "Run full test suite and generate safety-net report",
-      description: "Execute all existing tests to confirm baseline behavior is preserved.",
+      title: "Detect and run supported repository verification",
+      description: "Use a recognized native test runner only when an isolated runtime and dependencies are available.",
       status: "pending",
       filesAffected: ["test/", "tests/", "__tests__/"],
       risk: "low",
@@ -484,28 +550,33 @@ function buildPlan(risks: RiskFinding[], stack: DetectedStack, dir: string): Pla
 
 // ── Git helpers ───────────────────────────────────────────────────────────────
 
-async function cloneRepo(url: string, targetDir: string): Promise<void> {
+async function cloneRepo(url: string, targetDir: string, branch?: string): Promise<void> {
+  const args = ["clone", "--depth", "1", "--no-tags"];
+  if (branch) args.push("--branch", branch);
+  args.push(url, targetDir);
   await execFileAsync(
     "git",
-    ["clone", "--depth", "1", "--no-tags", url, targetDir],
+    args,
     { timeout: 60_000 }
   );
 }
 
-async function getCommitInfo(dir: string): Promise<{ sha: string; message: string; branch: string }> {
+async function getCommitInfo(dir: string): Promise<{ sha: string; message: string; branch: string; date: string }> {
   try {
-    const [shaResult, msgResult, branchResult] = await Promise.all([
+    const [shaResult, msgResult, branchResult, dateResult] = await Promise.all([
       execFileAsync("git", ["rev-parse", "HEAD"], { cwd: dir }),
       execFileAsync("git", ["log", "-1", "--format=%s"], { cwd: dir }),
       execFileAsync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: dir }),
+      execFileAsync("git", ["log", "-1", "--format=%cs"], { cwd: dir }),
     ]);
     return {
       sha: shaResult.stdout.trim().slice(0, 12),
       message: msgResult.stdout.trim().slice(0, 120),
       branch: branchResult.stdout.trim(),
+      date: dateResult.stdout.trim(),
     };
   } catch {
-    return { sha: "unknown", message: "unknown", branch: "unknown" };
+    return { sha: "unknown", message: "unknown", branch: "unknown", date: "unknown" };
   }
 }
 
@@ -513,8 +584,8 @@ async function getCommitInfo(dir: string): Promise<{ sha: string; message: strin
 
 export async function analyzeRepository(
   repoUrl: string,
-  branch = "main"
-): Promise<WorkflowState> {
+  branch?: string
+): Promise<{ workflow: WorkflowState; workspacePath: string }> {
   const parsed = validateRepoUrl(repoUrl);
   if (!parsed) {
     throw Object.assign(new Error("Invalid repository URL. Only public GitHub HTTPS URLs are supported."), {
@@ -540,7 +611,7 @@ export async function analyzeRepository(
 
     // Clone
     try {
-      await cloneRepo(repoUrl, tmpDir);
+      await cloneRepo(repoUrl, tmpDir, branch);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("not found") || msg.includes("does not exist") || msg.includes("Repository not found")) {
@@ -569,8 +640,8 @@ export async function analyzeRepository(
     log("info", `Detected: ${stack.primaryLanguage} / ${stack.framework} / ${stack.runtime}`);
 
     // File counts
-    const ALL_EXTS = [".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".go", ".rs",
-                      ".rb", ".php", ".c", ".cpp", ".cs", ".swift", ".kt", ".html", ".css"];
+    const ALL_EXTS = [".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx", ".py", ".java", ".go", ".rs",
+              ".rb", ".php", ".c", ".h", ".cpp", ".hpp", ".cs", ".swift", ".kt", ".html", ".css", ".scss", ".vue", ".svelte", ".sql", ".sh"];
     const totalFiles = countFilesRecursive(tmpDir, ALL_EXTS);
     const loc = linesOfCodeEstimate(tmpDir);
     log("info", `Files: ${totalFiles}, estimated LOC: ${loc}`);
@@ -594,11 +665,13 @@ export async function analyzeRepository(
     log("success", `Analysis complete in ${durationStr}`);
 
     // Assemble repository info
+    const projectStructure = collectProjectStructure(tmpDir);
+    const architecture = buildArchitecture(projectStructure);
     const repository: Repository = {
       name: parsed.repo,
       url: repoUrl,
       owner: parsed.owner,
-      branch: commitInfo.branch !== "unknown" ? commitInfo.branch : branch,
+      branch: commitInfo.branch !== "unknown" ? commitInfo.branch : branch ?? "not detected",
       currentCommit: commitInfo.sha,
       commitMessage: commitInfo.message,
       runtime: stack.runtime,
@@ -607,72 +680,60 @@ export async function analyzeRepository(
       detectedLanguages: stack.languages,
       packageManager: stack.packageManager,
       projectType: stack.projectType,
-      lastCommit: new Date().toISOString().slice(0, 10),
+      lastCommit: commitInfo.date,
       linesOfCode: loc,
       files: totalFiles,
+      projectStructure,
     };
 
-    // Build verification placeholder (real run would invoke tools/validate.js)
-    const baseTests = [
-      { name: "Repository analysis complete",             file: "analysis", status: "passed" as const, duration: durationStr },
-      { name: "Repository URL validated",                 file: "validation", status: "passed" as const, duration: "1ms" },
-      { name: `Primary language detected: ${stack.primaryLanguage}`, file: "detection", status: "passed" as const, duration: "1ms" },
-      { name: `Framework detected: ${stack.framework}`,  file: "detection", status: "passed" as const, duration: "1ms" },
-      { name: `Package manager: ${stack.packageManager}`,file: "detection", status: "passed" as const, duration: "1ms" },
-      { name: `${totalFiles} source files found`,         file: "filesystem", status: "passed" as const, duration: "5ms" },
-    ];
-
-    const verificationPass = {
+    const verificationNotRun = {
+      status: "not_run" as const,
       stepId: 1,
-      suite: "Repository analysis checks",
-      duration: durationStr,
+      suite: "Repository verification",
+      duration: "not run",
       coverage: 0,
-      coverageNote: "Coverage requires test execution against the cloned repository. Not run during analysis.",
-      tests: baseTests,
-      exitCode: 0,
-      summary: `${baseTests.length} checks passed`,
-    };
-
-    const verificationFail = {
-      ...verificationPass,
-      tests: [
-        ...baseTests,
-        {
-          name: "Full test suite (not yet run — execution phase not started)",
-          file: "pending",
-          status: "skipped" as const,
-          duration: "0ms",
-        },
-      ],
+      coverageNote: "Coverage not available until a supported verification command runs.",
+      tests: [],
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      exitCode: null,
+      summary: "Verification not run.",
+      output: "",
+      command: null,
     };
 
     const workflowState: WorkflowState = {
       runId,
-      currentPhase: "ASSESS",
+      currentPhase: "PLAN",
       overallStatus: "running",
       createdAt: now,
       updatedAt: endNow,
       errors: [],
+      operationStatus: "idle",
       repository,
+      architecture,
       safetyNet: {
-        total: baseTests.length,
-        passing: baseTests.length,
+        total: 0,
+        passing: 0,
         failing: 0,
-        generatedBy: "Legacy Code Whisperer — Repository Analysis",
+        generatedBy: "not run",
         createdAt: now,
       },
-      overallProgress: Math.round((1 / Math.max(plan.length, 1)) * 100),
+      overallProgress: Math.round(100 / Math.max(plan.length, 1)),
       risks,
       plan,
       execution: {
         currentStepId: plan[1]?.id ?? 1,
         status: "not_available",
+        message: "No approved repository-specific operation is available for these analysis findings.",
         log: auditTrail.map(a => ({ time: a.time, text: `${a.type.toUpperCase()}: ${a.message}` })) as ActivityLogEntry[],
         filesChanged: [],
       },
       verification: {
-        pass: verificationPass,
-        fail: verificationFail,
+        baseline: null,
+        recovery: null,
       },
       rollback: {
         stepId: 0,
@@ -684,6 +745,8 @@ export async function analyzeRepository(
         errorMessage: "No rollback has been triggered for this session.",
         previousCommit: commitInfo.sha,
         failedCommit: "",
+        targetCommit: commitInfo.sha,
+        rollbackCommit: null,
         rollbackStatus: "not_triggered",
         recoveryValidation: "not_run",
         bobExplanation: "No rollback has been triggered. Rollback will be available after execution and verification phases.",
@@ -710,28 +773,20 @@ export async function analyzeRepository(
           "Framework":       stack.framework,
           "Runtime":         stack.runtime,
           "Steps planned":   plan.length.toString(),
-          "Steps completed": "1",
-          "Status":          "analysis complete",
+          "Steps completed": "1 (baseline recorded)",
+          "Status":          "analysis complete; no execution performed",
         },
-        changesApplied: [
-          {
-            title: "Repository analysis and risk assessment",
-            files: ["(read-only analysis — no files changed)"],
-            status: "applied",
-            time: new Date().toTimeString().slice(0, 8),
-          },
-        ],
+        changesApplied: [],
         rollbacks: [],
         auditTrail,
       },
     };
 
-    return workflowState;
-
-  } finally {
-    // Always clean up temp directory
+    return { workflow: workflowState, workspacePath: tmpDir };
+  } catch (error) {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch { /* ignore cleanup errors */ }
+    throw error;
   }
 }

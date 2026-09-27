@@ -13,7 +13,7 @@
 
 export type RiskLevel = "low" | "medium" | "high";
 
-export type StepStatus = "pending" | "running" | "passed" | "failed" | "rolled_back" | "recovered" | (string & {});
+export type StepStatus = "pending" | "running" | "passed" | "failed" | "rolled_back" | "recovered" | "unverified" | (string & {});
 
 export type TestOutcome = "passed" | "failed" | "skipped";
 
@@ -52,6 +52,20 @@ export interface Repository {
   lastCommit: string;
   linesOfCode: number;
   files: number;
+  projectStructure: ProjectStructureEntry[];
+}
+
+export interface ProjectStructureEntry {
+  path: string;
+  kind: "directory" | "file";
+  files: number;
+}
+
+export interface RepositoryArchitecture {
+  available: boolean;
+  summary: string;
+  diagram: string | null;
+  components: ProjectStructureEntry[];
 }
 
 // ── Safety net (Protect phase) ───────────────────────────────────────────────
@@ -90,6 +104,7 @@ export interface PlanStep {
   testsDelta?: string;
   risk: RiskLevel;
   expectedImpact: string;
+  operationId?: string;
 }
 
 // ── Execution (Execute phase) ────────────────────────────────────────────────
@@ -112,6 +127,7 @@ export interface ExecutionState {
   filesChanged: FileChange[];
   startingCommit?: string;
   modernizationCommit?: string;
+  message: string;
 }
 
 // ── Verification (Verify phase) ──────────────────────────────────────────────
@@ -126,6 +142,7 @@ export interface TestResult {
 }
 
 export interface VerificationRun {
+  status: "not_run" | "running" | "passed" | "failed" | "not_available";
   stepId: number;
   suite: string;
   duration: string;
@@ -133,8 +150,14 @@ export interface VerificationRun {
   coverageNote: string;
   /** All test results for this run */
   tests: TestResult[];
-  exitCode?: number;
-  summary?: string;
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  exitCode: number | null;
+  summary: string;
+  output: string;
+  command: string | null;
 }
 
 // Derived counts — computed, not stored
@@ -170,6 +193,8 @@ export interface RollbackEvent {
   previousCommit: string;
   /** Commit hash of the failing change (to be reverted) */
   failedCommit: string;
+  targetCommit: string;
+  rollbackCommit: string | null;
   /** Status of the rollback itself */
   rollbackStatus: "pending" | "running" | "complete" | "failed" | "not_triggered" | (string & {});
   /** Status of the verification run that confirmed recovery */
@@ -231,18 +256,19 @@ export interface WorkflowState {
   createdAt: string;
   updatedAt: string;
   errors: string[];
+  operationStatus: "idle" | "running" | "complete" | "failed";
   /** Derived from the URL the user entered on the Start screen */
   repository: Repository;
+  architecture: RepositoryArchitecture;
   safetyNet: SafetyNet;
   /** 0–100 */
   overallProgress: number;
   risks: RiskFinding[];
   plan: PlanStep[];
   execution: ExecutionState;
-  /** Backend verification payloads; these can contain analysis checks before checkpoint execution. */
   verification: {
-    pass: VerificationRun;
-    fail: VerificationRun;
+    baseline: VerificationRun | null;
+    recovery: VerificationRun | null;
   };
   /** Present only after a real checkpoint test result has been received. */
   checkpointResult?: VerificationRun;
@@ -254,4 +280,5 @@ export interface WorkflowState {
 
 export interface WorkflowContextValue {
   state: WorkflowState;
+  setState: (state: WorkflowState) => void;
 }

@@ -8,18 +8,21 @@ const EXECUTION_STATUS: Record<string, { label: string; color: string }> = {
   failed: { label: "Failed", color: "var(--red)" },
 };
 
-export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: () => void; onRollback?: () => void }) {
+export default function ExecutionScreen({ onVerify, onRollback, onExecute, onRunVerification }: {
+  onVerify?: () => void;
+  onRollback?: () => void;
+  onExecute?: () => void;
+  onRunVerification?: () => void;
+}) {
   const { state } = useWorkflow();
   const { execution, plan } = state;
   const step = plan.find((item) => item.id === execution.currentStepId);
-  const checkpoint = state.checkpointResult?.tests.length ? state.checkpointResult : undefined;
-  const status = checkpoint
-    ? EXECUTION_STATUS[execution.status] ?? { label: "Unknown status", color: "var(--muted)" }
-    : { label: "Execution: not available", color: "var(--muted)" };
-  const passed = checkpoint?.tests.filter((test) => test.status === "passed").length ?? 0;
-  const failed = checkpoint?.tests.filter((test) => test.status === "failed").length ?? 0;
-  const skipped = checkpoint?.tests.filter((test) => test.status === "skipped").length ?? 0;
-  const allPassed = Boolean(checkpoint && passed === checkpoint.tests.length);
+  const checkpoint = state.checkpointResult;
+  const status = EXECUTION_STATUS[execution.status] ?? { label: "Unknown status", color: "var(--muted)" };
+  const passed = checkpoint?.passed ?? 0;
+  const failed = checkpoint?.failed ?? 0;
+  const skipped = checkpoint?.skipped ?? 0;
+  const allPassed = Boolean(checkpoint && checkpoint.status === "passed");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -31,11 +34,9 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {checkpoint && failed === 0 && onVerify && (
-            <button onClick={onVerify} style={btnStyle("var(--green)")}>
-              View Verification →
-            </button>
-          )}
+          {onExecute && <button onClick={onExecute} disabled={state.operationStatus === "running"} style={btnStyle("var(--accent)")}>Execute next safe step</button>}
+          {onRunVerification && <button onClick={onRunVerification} disabled={state.operationStatus === "running"} style={btnStyle("var(--accent)")}>Run verification</button>}
+          {checkpoint && onVerify && <button onClick={onVerify} style={btnStyle("var(--muted)")}>View Verification →</button>}
           {checkpoint && failed > 0 && onRollback && (
             <button onClick={onRollback} style={btnStyle("var(--yellow)")}>
               View Rollback →
@@ -48,8 +49,8 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
       <div
         style={{
           padding: "14px 18px",
-          background: checkpoint && execution.status === "running" ? "#9e6a0322" : "var(--surface-2)",
-          border: `1px solid ${checkpoint && execution.status === "running" ? "#9e6a0355" : "var(--border)"}`,
+          background: execution.status === "running" ? "#9e6a0322" : "var(--surface-2)",
+          border: `1px solid ${execution.status === "running" ? "#9e6a0355" : "var(--border)"}`,
           borderRadius: "var(--radius)",
           display: "flex",
           gap: 12,
@@ -91,15 +92,13 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
               gap: 4,
             }}
           >
-            {(checkpoint && execution.status !== "not_available" ? execution.log : []).map((line, i) => (
+            {execution.log.map((line, i) => (
               <div key={i} style={{ display: "flex", gap: 10, lineHeight: 1.7 }}>
                 <span style={{ color: "var(--muted)", flexShrink: 0 }}>{line.time}</span>
                 <span style={{ color: "var(--text)" }}>{line.text}</span>
               </div>
             ))}
-            {!checkpoint && (
-              <span style={{ color: "var(--muted)" }}>Execution: not available</span>
-            )}
+            {!execution.log.length && <span style={{ color: "var(--muted)" }}>{execution.message || status.label}</span>}
           </div>
         </div>
 
@@ -133,13 +132,15 @@ export default function ExecutionScreen({ onVerify, onRollback }: { onVerify?: (
             style={{ border: "1px solid var(--border)" }}
           >
             <div className="section-title">Safety Net Tests</div>
-            {checkpoint ? (
+            {checkpoint && checkpoint.status !== "not_run" && checkpoint.status !== "not_available" ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10, color: failed ? "var(--red)" : allPassed ? "var(--green)" : "var(--muted)" }}>
                 <span style={{ fontSize: 18 }}>{failed ? "✗" : allPassed ? "✓" : "—"}</span>
-                <span style={{ fontWeight: 700 }}>{passed} passed, {failed} failed, {skipped} skipped</span>
+                <span style={{ fontWeight: 700 }}>{checkpoint.status}: {checkpoint.total} total, {passed} passed, {failed} failed, {skipped} skipped; exit {checkpoint.exitCode ?? "not available"}</span>
               </div>
+            ) : checkpoint?.status === "not_available" ? (
+              <div style={{ color: "var(--muted)" }}>{checkpoint.summary}</div>
             ) : (
-              <div style={{ color: "var(--muted)" }}>Safety Net: not run</div>
+              <div style={{ color: "var(--muted)" }}>{checkpoint?.summary ?? "Safety Net: not run"}</div>
             )}
           </div>
         </div>

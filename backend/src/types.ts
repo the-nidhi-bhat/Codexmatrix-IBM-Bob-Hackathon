@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type RiskLevel = "low" | "medium" | "high";
-export type StepStatus = "pending" | "running" | "passed" | "failed" | "rolled_back" | "recovered";
+export type StepStatus = "pending" | "running" | "passed" | "failed" | "rolled_back" | "recovered" | "unverified";
 export type TestOutcome = "passed" | "failed" | "skipped";
 export type ChangeStatus = "applied" | "rolled-back" | "failed";
 export type AuditEntryType = "info" | "success" | "warn" | "error";
@@ -36,6 +36,20 @@ export interface Repository {
   lastCommit: string;
   linesOfCode: number;
   files: number;
+  projectStructure: ProjectStructureEntry[];
+}
+
+export interface ProjectStructureEntry {
+  path: string;
+  kind: "directory" | "file";
+  files: number;
+}
+
+export interface RepositoryArchitecture {
+  available: boolean;
+  summary: string;
+  diagram: string | null;
+  components: ProjectStructureEntry[];
 }
 
 export interface SafetyNet {
@@ -67,6 +81,7 @@ export interface PlanStep {
   testsDelta?: string;
   risk: RiskLevel;
   expectedImpact: string;
+  operationId?: string;
 }
 
 export interface ActivityLogEntry {
@@ -87,6 +102,7 @@ export interface ExecutionState {
   filesChanged: FileChange[];
   startingCommit?: string;
   modernizationCommit?: string;
+  message: string;
 }
 
 export interface TestResult {
@@ -99,14 +115,21 @@ export interface TestResult {
 }
 
 export interface VerificationRun {
+  status: "not_run" | "running" | "passed" | "failed" | "not_available";
   stepId: number;
   suite: string;
   duration: string;
   coverage: number;
   coverageNote: string;
   tests: TestResult[];
-  exitCode?: number;
-  summary?: string;
+  total: number;
+  passed: number;
+  failed: number;
+  skipped: number;
+  exitCode: number | null;
+  summary: string;
+  output: string;
+  command: string | null;
 }
 
 export interface RollbackTimelineEntry {
@@ -125,6 +148,8 @@ export interface RollbackEvent {
   errorMessage: string;
   previousCommit: string;
   failedCommit: string;
+  targetCommit: string;
+  rollbackCommit: string | null;
   rollbackStatus: "pending" | "running" | "complete" | "failed" | "not_triggered";
   recoveryValidation: "pending" | "running" | "passed" | "failed" | "not_run";
   bobExplanation: string;
@@ -174,16 +199,19 @@ export interface WorkflowState {
   createdAt: string;
   updatedAt: string;
   errors: string[];
+  operationStatus: "idle" | "running" | "complete" | "failed";
   repository: Repository;
+  architecture: RepositoryArchitecture;
   safetyNet: SafetyNet;
   overallProgress: number;
   risks: RiskFinding[];
   plan: PlanStep[];
   execution: ExecutionState;
   verification: {
-    pass: VerificationRun;
-    fail: VerificationRun;
+    baseline: VerificationRun | null;
+    recovery: VerificationRun | null;
   };
+  checkpointResult?: VerificationRun;
   rollback: RollbackEvent;
   report: SessionReport;
 }

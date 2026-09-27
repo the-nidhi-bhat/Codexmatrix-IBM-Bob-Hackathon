@@ -40,6 +40,7 @@ export const MOCK_REPOSITORY: Repository = {
   lastCommit: "2021-03-14",
   linesOfCode: 4821,
   files: 63,
+  projectStructure: [],
 };
 
 // ── Plan steps ────────────────────────────────────────────────────────────────
@@ -142,16 +143,26 @@ const COVERAGE_NOTE =
 
 /** PASS scenario — 18 passed / 0 failed / 0 skipped */
 const VERIFICATION_PASS: VerificationRun = {
+  status: "passed",
   stepId: 3,
   suite: "Safety Net v1 — behavioral tests",
   duration: "1.62s",
   coverage: 91,
   coverageNote: COVERAGE_NOTE,
   tests: BASE_TESTS,
+  total: BASE_TESTS.length,
+  passed: BASE_TESTS.filter((test) => test.status === "passed").length,
+  failed: 0,
+  skipped: BASE_TESTS.filter((test) => test.status === "skipped").length,
+  exitCode: 0,
+  summary: "Mock fixture only",
+  output: "",
+  command: null,
 };
 
 /** FAIL scenario — 16 passed / 2 failed / 0 skipped */
 const VERIFICATION_FAIL: VerificationRun = {
+  status: "failed",
   stepId: 3,
   suite: "Safety Net v1 — behavioral tests",
   duration: "1.84s",
@@ -177,6 +188,14 @@ const VERIFICATION_FAIL: VerificationRun = {
     }
     return t;
   }),
+  total: BASE_TESTS.length,
+  passed: BASE_TESTS.filter((test) => test.status === "passed").length - 2,
+  failed: 2,
+  skipped: BASE_TESTS.filter((test) => test.status === "skipped").length,
+  exitCode: 1,
+  summary: "Mock fixture only",
+  output: "",
+  command: null,
 };
 
 // ── Full mock WorkflowState ───────────────────────────────────────────────────
@@ -194,6 +213,8 @@ export function buildMockWorkflowState(repoUrl: string): WorkflowState {
     createdAt: "2025-09-26T10:40:00Z",
     updatedAt: "2025-09-26T10:52:44Z",
     errors: [],
+    operationStatus: "idle",
+    architecture: { available: false, summary: "Mock fixture only", diagram: null, components: [] },
     repository: {
       ...MOCK_REPOSITORY,
       url: repoUrl,
@@ -297,6 +318,7 @@ export function buildMockWorkflowState(repoUrl: string): WorkflowState {
     execution: {
       currentStepId: 3,
       status: "running",
+      message: "Mock fixture only",
       log: [
         { time: "10:42:01", text: "IBM Bob: Analyzing src/routes/orders.js…" },
         { time: "10:42:03", text: "IBM Bob: Found 14 var declarations in 63 lines." },
@@ -314,9 +336,10 @@ export function buildMockWorkflowState(repoUrl: string): WorkflowState {
     },
 
     verification: {
-      pass: VERIFICATION_PASS,
-      fail: VERIFICATION_FAIL,
+      baseline: VERIFICATION_PASS,
+      recovery: VERIFICATION_FAIL,
     },
+    checkpointResult: VERIFICATION_FAIL,
 
     rollback: {
       stepId: 3,
@@ -329,6 +352,8 @@ export function buildMockWorkflowState(repoUrl: string): WorkflowState {
         "AssertionError: expected 199.99 to equal 200 — var-to-const change introduced a premature const binding that shadowed the accumulator variable.",
       previousCommit: "a3f9c12",
       failedCommit:   "b7d4e88",
+      targetCommit: "a3f9c12",
+      rollbackCommit: null,
       rollbackStatus: "complete",
       recoveryValidation: "passed",
       bobExplanation:

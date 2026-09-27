@@ -10,7 +10,7 @@ import RollbackScreen from "./screens/RollbackScreen";
 import ReportScreen from "./screens/ReportScreen";
 import { WorkflowProvider, useWorkflow } from "./workflow/WorkflowContext";
 import type { WorkflowState } from "./workflow/types";
-import { analyzeRepository, WorkflowApiError } from "./api/workflowApi";
+import { analyzeRepository, getRun, startExecution, startVerification, WorkflowApiError } from "./api/workflowApi";
 import "./App.css";
 
 type Screen = "architecture" | "overview" | "risk" | "plan" | "execution" | "verification" | "rollback" | "report";
@@ -46,10 +46,43 @@ const PHASE_LABELS: Record<Screen, string> = {
 // ── Dashboard (rendered inside WorkflowProvider) ─────────────────────────────
 
 function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: () => void }) {
-  const { state } = useWorkflow();
+  const { state, setState } = useWorkflow();
   const { repository, overallProgress } = state;
 
   const [active, setActive] = useState<Screen>("overview");
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (state.operationStatus !== "running") return;
+    const controller = new AbortController();
+    let polling = false;
+    const timer = setInterval(() => {
+      if (polling || controller.signal.aborted) return;
+      polling = true;
+      void getRun(state.runId, controller.signal)
+        .then(({ workflow }) => setState(workflow))
+        .catch((error: unknown) => {
+          if (!controller.signal.aborted) setActionError(error instanceof Error ? error.message : "Could not refresh workflow state.");
+        })
+        .finally(() => { polling = false; });
+    }, 1200);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [state.runId, state.operationStatus, setState]);
+
+  async function executeNextStep() {
+    setActionError(null);
+    try { setState(await startExecution(state.runId)); }
+    catch (error: unknown) { setActionError(error instanceof Error ? error.message : "Execution request failed."); }
+  }
+
+  async function verifyRepository() {
+    setActionError(null);
+    try { setState(await startVerification(state.runId)); }
+    catch (error: unknown) { setActionError(error instanceof Error ? error.message : "Verification request failed."); }
+  }
 
   function navigate(screen: Screen) {
     setActive(screen);
@@ -113,8 +146,10 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
           >
             <span style={{ color: "var(--muted)", fontSize: 10 }}>●</span>
             <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600 }}>
-              {state.checkpointResult && state.checkpointResult.tests.length > 0
-                ? "Safety Net result received"
+              {state.checkpointResult?.status === "running" ? "Safety Net: running"
+                : state.checkpointResult?.status === "not_available" ? "Safety Net: not available"
+                : state.checkpointResult?.status === "passed" ? `Safety Net: ${state.checkpointResult.passed}/${state.checkpointResult.total} passed`
+                : state.checkpointResult?.status === "failed" ? `Safety Net: ${state.checkpointResult.failed} failed`
                 : "Safety Net: not run"}
             </span>
           </div>
@@ -215,6 +250,11 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
 
         {/* Main content */}
         <main style={{ flex: 1, padding: "28px 40px", minWidth: 0, maxWidth: 1400 }}>
+          {actionError && (
+            <div role="alert" className="card" style={{ marginBottom: 16, borderColor: "var(--red)", color: "var(--red)" }}>
+              Workflow request failed: {actionError}
+            </div>
+          )}
           {active === "architecture"  && <ArchitectureScreen />}
           {active === "overview"     && <OverviewScreen repoUrl={repoUrl} />}
           {active === "risk"         && <RiskScreen />}
@@ -223,9 +263,11 @@ function Dashboard({ repoUrl, onChangeRepo }: { repoUrl: string; onChangeRepo: (
             <ExecutionScreen
               onVerify={() => navigate("verification")}
               onRollback={() => navigate("rollback")}
+              onExecute={executeNextStep}
+              onRunVerification={verifyRepository}
             />
           )}
-          {active === "verification" && <VerificationScreen onRollback={() => navigate("rollback")} />}
+          {active === "verification" && <VerificationScreen onRollback={() => navigate("rollback")} onRunVerification={verifyRepository} />}
           {active === "rollback"     && <RollbackScreen />}
           {active === "report"       && <ReportScreen />}
         </main>
@@ -256,7 +298,7 @@ export default function App() {
     requestController.current = controller;
     setPhase({ kind: "loading", repoUrl });
     try {
-      const { workflow } = await analyzeRepository(repoUrl, "main", controller.signal);
+      const { workflow } = await analyzeRepository(repoUrl, undefined, controller.signal);
       if (controller.signal.aborted) return;
       setPhase({ kind: "dashboard", repoUrl, workflowState: workflow });
     } catch (err: unknown) {

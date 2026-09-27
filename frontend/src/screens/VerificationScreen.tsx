@@ -1,6 +1,6 @@
 import { useWorkflow } from "../workflow/WorkflowContext";
 
-export default function VerificationScreen({ onRollback }: { onRollback?: () => void }) {
+export default function VerificationScreen({ onRollback, onRunVerification }: { onRollback?: () => void; onRunVerification?: () => void }) {
   const { state } = useWorkflow();
   const v = state.checkpointResult;
 
@@ -14,15 +14,17 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
         <div className="card" style={{ color: "var(--muted)" }}>
           No checkpoint result has been received for this workflow.
         </div>
+        {onRunVerification && <button onClick={onRunVerification} disabled={state.operationStatus === "running"}>Run safe verification</button>}
       </div>
     );
   }
 
-  const passed  = v.tests.filter((t) => t.status === "passed").length;
-  const failed  = v.tests.filter((t) => t.status === "failed").length;
-  const skipped = v.tests.filter((t) => t.status === "skipped").length;
-  const overallPass = v.tests.length > 0 && passed === v.tests.length;
-  const overallFail = failed > 0;
+  const passed  = v.passed;
+  const failed  = v.failed;
+  const skipped = v.skipped;
+  const overallPass = v.status === "passed" && v.total > 0;
+  const overallFail = v.status === "failed";
+  const hasTestResults = v.status === "passed" || v.status === "failed";
   const resultColor = overallPass ? "var(--green)" : overallFail ? "var(--red)" : "var(--muted)";
 
   const stepTitle = state.plan.find((s) => s.id === v.stepId)?.title ?? `Step ${v.stepId}`;
@@ -33,9 +35,14 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Verification</h2>
           <p style={{ color: "var(--muted)" }}>
-            Safety-net tests run after every modernization step.
+            {v.summary}
           </p>
         </div>
+        {onRunVerification && (
+          <button onClick={onRunVerification} disabled={state.operationStatus === "running"}>
+            {state.operationStatus === "running" ? "Verification running…" : "Run safe verification"}
+          </button>
+        )}
       </div>
 
       {/* PASS / FAIL banner */}
@@ -61,10 +68,10 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
               color: resultColor,
             }}
           >
-            {overallPass ? "PASS — All checkpoint tests passing" : overallFail ? "FAIL — Regression detected" : "INCOMPLETE — Result not conclusive"}
+            {v.status === "not_available" ? "Verification not available" : overallPass ? "PASS — All checkpoint tests passing" : overallFail ? "FAIL — Regression detected" : v.status === "running" ? "Verification running" : "INCOMPLETE — Result not conclusive"}
           </div>
           <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>
-            Step {v.stepId}: {stepTitle} · {v.suite} · {v.duration}
+            Step {v.stepId}: {stepTitle} · {v.suite} · {v.duration} · exit code {v.exitCode ?? "not available"}
           </div>
         </div>
         {overallFail && onRollback && (
@@ -88,10 +95,13 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
         )}
       </div>
 
-      {/* Summary pills — counts come from workflow state */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
+      {!hasTestResults && (
+        <div className="card" style={{ color: "var(--muted)" }}>{v.summary}</div>
+      )}
+
+      {hasTestResults && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
         {[
-          { label: "Total",   count: v.tests.length, color: "var(--text)",   bg: "var(--surface-2)" },
+          { label: "Total",   count: v.total, color: "var(--text)",   bg: "var(--surface-2)" },
           { label: "Passed",  count: passed,          color: "var(--green)",  bg: "#23863622" },
           { label: "Failed",  count: failed,          color: "var(--red)",    bg: "var(--red-dim)" },
           { label: "Skipped", count: skipped,         color: "var(--muted)",  bg: "var(--surface-2)" },
@@ -110,10 +120,17 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
             <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>{label}</div>
           </div>
         ))}
+      </div>}
+
+      <div className="card">
+        <div className="section-title">Verification Summary</div>
+        <div>{v.summary}</div>
+        <div className="mono" style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>{v.command ?? "Command: not available"}</div>
+        {v.output && <pre className="mono" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: 320, overflow: "auto", color: "var(--muted)", fontSize: 11 }}>{v.output}</pre>}
       </div>
 
       {/* Test list */}
-      <div className="card">
+      {hasTestResults && <div className="card">
         <div className="section-title">Test Results</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
           {v.tests.map((t, i) => {
@@ -179,12 +196,11 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
             );
           })}
         </div>
-      </div>
+      </div>}
 
-      {/* Coverage note */}
-      <div className="card" style={{ display: "flex", gap: 20, alignItems: "center" }}>
+      {hasTestResults && <div className="card" style={{ display: "flex", gap: 20, alignItems: "center" }}>
         <div style={{ textAlign: "center", flexShrink: 0 }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "var(--accent)" }}>{v.coverage}%</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "var(--accent)" }}>{v.coverage > 0 ? `${v.coverage}%` : "not available"}</div>
           <div style={{ color: "var(--muted)", fontSize: 11 }}>Coverage</div>
         </div>
         <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 20, flex: 1 }}>
@@ -193,7 +209,7 @@ export default function VerificationScreen({ onRollback }: { onRollback?: () => 
             {v.coverageNote}
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

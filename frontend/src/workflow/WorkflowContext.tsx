@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import type { WorkflowContextValue, WorkflowState } from "./types";
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -32,8 +32,11 @@ interface WorkflowProviderProps {
  * The state is owned by App (fetched from backend) and passed in as a prop.
  */
 export function WorkflowProvider({ state, children }: WorkflowProviderProps) {
+  const [workflowState, setWorkflowState] = useState(state);
+
   const value: WorkflowContextValue = {
-    state,
+    state: workflowState,
+    setState: setWorkflowState,
   };
 
   return (

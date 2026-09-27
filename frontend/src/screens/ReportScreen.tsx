@@ -38,7 +38,7 @@ export default function ReportScreen() {
           {[
             { label: "Steps Completed",  value: state.execution.status === "not_available" ? "not available" : r.stepsCompleted.toString(),  color: "var(--muted)" },
             { label: "Steps Rolled Back", value: state.rollback.rollbackStatus === "not_triggered" ? "not triggered" : r.stepsRolledBack.toString(), color: "var(--muted)" },
-            { label: "Tests Passing",    value: state.checkpointResult?.tests.length ? `${state.checkpointResult.tests.filter((test) => test.status === "passed").length}/${state.checkpointResult.tests.length}` : "not run", color: "var(--muted)" },
+            { label: "Tests Passing",    value: state.checkpointResult?.status === "not_available" ? "not available" : state.checkpointResult?.status === "running" ? "running" : state.checkpointResult?.status === "passed" || state.checkpointResult?.status === "failed" ? `${state.checkpointResult.passed}/${state.checkpointResult.total}` : "not run", color: "var(--muted)" },
             { label: "Duration",         value: r.duration,                   color: "var(--text)" },
           ].map(({ label, value, color }) => (
             <div

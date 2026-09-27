@@ -55,16 +55,30 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+function isVerificationRun(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.status === "string"
+    && typeof value.total === "number"
+    && typeof value.passed === "number"
+    && typeof value.failed === "number"
+    && typeof value.skipped === "number"
+    && (typeof value.exitCode === "number" || value.exitCode === null)
+    && typeof value.summary === "string"
+    && typeof value.output === "string"
+    && Array.isArray(value.tests);
+}
+
 function isWorkflowState(value: unknown): value is WorkflowState {
   if (!isRecord(value) || !isRecord(value.repository) || !isRecord(value.safetyNet)
     || !isRecord(value.execution) || !isRecord(value.verification) || !isRecord(value.rollback)
-    || !isRecord(value.report)) return false;
+    || !isRecord(value.report) || !isRecord(value.architecture)) return false;
 
   const repository = value.repository;
   const execution = value.execution;
   const verification = value.verification;
   const rollback = value.rollback;
   const report = value.report;
+  const architecture = value.architecture;
   return typeof value.runId === "string"
     && typeof value.currentPhase === "string"
     && typeof value.overallStatus === "string"
@@ -86,6 +100,7 @@ function isWorkflowState(value: unknown): value is WorkflowState {
     && typeof repository.lastCommit === "string"
     && typeof repository.linesOfCode === "number"
     && typeof repository.files === "number"
+    && Array.isArray(repository.projectStructure)
     && typeof value.safetyNet.total === "number"
     && typeof value.safetyNet.passing === "number"
     && typeof value.safetyNet.failing === "number"
@@ -94,14 +109,18 @@ function isWorkflowState(value: unknown): value is WorkflowState {
     && typeof value.overallProgress === "number"
     && Array.isArray(value.risks)
     && Array.isArray(value.plan)
+    && typeof architecture.available === "boolean"
+    && typeof architecture.summary === "string"
+    && (typeof architecture.diagram === "string" || architecture.diagram === null)
+    && Array.isArray(architecture.components)
+    && typeof value.operationStatus === "string"
     && typeof execution.currentStepId === "number"
     && typeof execution.status === "string"
     && Array.isArray(execution.log)
     && Array.isArray(execution.filesChanged)
-    && isRecord(verification.pass)
-    && Array.isArray(verification.pass.tests)
-    && isRecord(verification.fail)
-    && Array.isArray(verification.fail.tests)
+    && (verification.baseline === null || isVerificationRun(verification.baseline))
+    && (verification.recovery === null || isVerificationRun(verification.recovery))
+    && (value.checkpointResult === undefined || isVerificationRun(value.checkpointResult))
     && typeof rollback.rollbackStatus === "string"
     && typeof rollback.recoveryValidation === "string"
     && Array.isArray(rollback.timeline)
@@ -189,15 +208,25 @@ async function requestWithTimeout(
  */
 export async function analyzeRepository(
   repoUrl: string,
-  branch = "main",
+  branch?: string,
   signal?: AbortSignal,
 ): Promise<{ runId: string; workflow: WorkflowState }> {
   const data = await requestWithTimeout("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repoUrl, branch }),
+    body: JSON.stringify(branch ? { repoUrl, branch } : { repoUrl }),
   }, signal);
   return { runId: data.runId, workflow: data.workflow };
+}
+
+export async function startExecution(runId: string, signal?: AbortSignal): Promise<WorkflowState> {
+  const data = await requestWithTimeout(`/api/runs/${encodeURIComponent(runId)}/execute`, { method: "POST" }, signal);
+  return data.workflow;
+}
+
+export async function startVerification(runId: string, signal?: AbortSignal): Promise<WorkflowState> {
+  const data = await requestWithTimeout(`/api/runs/${encodeURIComponent(runId)}/verify`, { method: "POST" }, signal);
+  return data.workflow;
 }
 
 /**

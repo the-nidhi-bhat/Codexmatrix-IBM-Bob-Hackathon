@@ -9,6 +9,7 @@ const STATUS_CONFIG: Record<string, { icon: string; color: string; label: string
   failed:      { icon: "✗", color: "var(--red)",     label: "Failed" },
   rolled_back: { icon: "↺", color: "var(--yellow)",  label: "Rolled back" },
   recovered:   { icon: "✓", color: "var(--green)",   label: "Recovered" },
+  unverified:  { icon: "—", color: "var(--muted)",    label: "Applied · unverified" },
 };
 
 function ConnectorLine({ active }: { active: boolean }) {
@@ -178,21 +179,29 @@ export default function PlanScreen() {
   const completed  = planSteps.filter((s) => s.status === "passed" || s.status === "recovered").length;
   const inProgress = planSteps.filter((s) => s.status === "running").length;
   const pending    = planSteps.filter((s) => s.status === "pending").length;
+  const unverified = planSteps.filter((s) => s.status === "unverified").length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Modernization Plan</h2>
         <p style={{ color: "var(--muted)" }}>
-          IBM Bob's incremental step-by-step plan — click any step for details.
+          Backend analysis plan — click any step for details.
         </p>
       </div>
+
+      {!planSteps.some((step) => step.operationId) && (
+        <div className="card" style={{ color: "var(--muted)" }}>
+          Execution not available: no approved controlled transformation was identified for this repository.
+        </div>
+      )}
 
       <div className="card" style={{ display: "flex", gap: 24, alignItems: "center" }}>
         {[
           { label: "Completed",   count: completed,  color: "var(--green)"  },
           { label: "In Progress", count: inProgress, color: "var(--yellow)" },
           { label: "Pending",     count: pending,    color: "var(--muted)"  },
+          ...(unverified > 0 ? [{ label: "Unverified", count: unverified, color: "var(--muted)" }] : []),
           { label: "Total Steps", count: planSteps.length, color: "var(--text)" },
         ].map(({ label, count, color }) => (
           <div key={label} style={{ textAlign: "center" }}>

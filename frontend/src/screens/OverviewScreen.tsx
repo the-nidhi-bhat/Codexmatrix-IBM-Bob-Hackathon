@@ -18,14 +18,20 @@ function ProgressBar({ value }: { value: number }) {
 }
 
 function SafetyNetBadge({ result }: { result?: VerificationRun }) {
-  if (!result || result.tests.length === 0) {
+  if (!result || result.status === "not_run") {
     return <div className="card" style={{ color: "var(--muted)" }}>Safety Net: not run</div>;
   }
+  if (result.status === "not_available") {
+    return <div className="card" style={{ color: "var(--muted)" }}>Safety Net: not available · {result.summary}</div>;
+  }
+  if (result.status === "running") {
+    return <div className="card" style={{ color: "var(--muted)" }}>Safety Net: verification running</div>;
+  }
 
-  const passing = result.tests.filter((test) => test.status === "passed").length;
-  const failing = result.tests.filter((test) => test.status === "failed").length;
-  const total = result.tests.length;
-  const allPass = total > 0 && passing === total;
+  const passing = result.passed;
+  const failing = result.failed;
+  const total = result.total;
+  const allPass = result.status === "passed" && total > 0 && passing === total;
   const resultColor = allPass ? "var(--green)" : failing > 0 ? "var(--red)" : "var(--muted)";
   return (
     <div
@@ -42,10 +48,10 @@ function SafetyNetBadge({ result }: { result?: VerificationRun }) {
       <span style={{ fontSize: 24, color: resultColor }}>{allPass ? "✓" : failing > 0 ? "✗" : "—"}</span>
       <div>
         <div style={{ fontWeight: 700, color: resultColor, fontSize: 16 }}>
-          {allPass ? "Safety Net passed" : failing > 0 ? "Safety Net failed" : "Safety Net result inconclusive"}: {passing}/{total} tests passing
+          {allPass ? `Safety Net passed: ${passing}/${total}` : failing > 0 ? `Safety Net failed: ${failing} failed` : "Safety Net result inconclusive"}
         </div>
         <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 2 }}>
-          {result.suite} · {result.duration}
+          {result.summary} · {result.suite} · {result.duration}
         </div>
       </div>
     </div>
