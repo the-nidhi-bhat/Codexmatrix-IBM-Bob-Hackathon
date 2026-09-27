@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Get24</title>
+		<!-- Author: Cory Gross (cmg0030@tigermail.auburn.edu) -->
+		<!-- Last Modified: January 26, 2013 -->
+		<!-- Server source code at http://github.com/CoryG89/Get24 -->
+		
+		<!-- Socket.IO Client API (symbolic src path handled by the server) -->
+		<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+		<!-- KineticJS canvas gfx library for ease of use, perf, layering -->
+		<script type="text/javascript" src="js/kinetic-v4.6.0.min.js"></script>
+
+		<!-- Apply our own custom stylesheet last, to override anything else -->
+		<link type="text/css" rel="stylesheet" href="css/styles.css" />
+	</head>
+<body>
+	
+	<!-- KineticJS wrapper && stage container -->
+	<div id="wrapper">
+		<div id="container"></div>
+		<form id="eval-form">
+			<input type="text" id="eval-input" disabled />
+			<input type="submit" id="submit-input" value="Submit" disabled>
+		</form>
+	</div>
+
+	<!-- Include SocketIO connection setup and custom event handlers -->
+	<script type="text/javascript" src="js/SocketController.js"></script>
+	
+	<!-- KineticJS Stage, elements, event handlers, and related functions -->
+	<script type="text/javascript" src="js/StageController.js"></script>
+</body>
+</html>
