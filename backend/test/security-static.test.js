@@ -279,30 +279,26 @@ test("KNOWN LIMITATION, unchanged by M3.3: the engine composes one git command a
   );
 });
 
-test("the backend binds loopback only and does not allow any origin", () => {
-  // src/app.ts holds the pipeline since the integration milestone: index.ts only
-  // listens. Reading index.ts here would have gone on passing after the config
-  // moved, which is the failure mode this assertion exists to prevent.
+test("the backend uses validated host configuration, authenticated external access and exact CORS origins", () => {
   const app = OWNED.find((s) => s.relative === "backend/src/app.ts");
   assert.ok(app, "src/app.ts must exist and own the request pipeline");
-  // The bind lives with the listen call, in index.ts; the pipeline lives in
-  // app.ts. Reading either from the other is how a check goes on passing after
-  // the code moved, which is the failure this assertion exists to prevent.
   const entry = OWNED.find((s) => s.relative === "backend/src/index.ts");
-  assert.match(entry.code, /listen\(\s*PORT\s*,\s*["']127\.0\.0\.1["']/, "the server must not listen on every interface");
-  assert.deepEqual(
-    describe(codeOccurrences(OWNED, /listen\(\s*0\.0\.0\.0/)),
-    [],
-    "a bare 0.0.0.0 listen is the thing to avoid",
-  );
+  const config = OWNED.find((s) => s.relative === "backend/src/config.ts");
+  assert.match(entry.code, /loadServerConfig\(\)/, "the entry point must use validated environment configuration");
+  assert.match(entry.code, /listen\(config\.port,\s*config\.host/);
+  assert.match(config.code, /production\s*\?\s*["']0\.0\.0\.0["']\s*:\s*["']127\.0\.0\.1["']/);
+  assert.match(config.code, /API_AUTH_TOKEN/);
+  assert.match(config.code, /FRONTEND_ORIGIN/);
+  assert.match(app.code, /timingSafeEqual/);
+  assert.match(app.code, /req\.path\s*===\s*["']\/health["']/);
   assert.deepEqual(
     describe(codeOccurrences(OWNED, /origin\s*:\s*["'`]?\*["'`]?/)),
     [],
     "CORS must not be a wildcard",
   );
-  for (const devOrigin of ["http://localhost:5173", "http://localhost:4173"]) {
-    assert.ok(app.raw.includes(devOrigin), `expected the dev origin ${devOrigin} in the allowlist`);
-  }
+  assert.match(app.code, /http:\/\/localhost:5173/);
+  assert.match(app.code, /http:\/\/localhost:4173/);
+  assert.match(app.code, /Authorization/);
   // A body limit is a trust boundary, not a tuning knob.
   assert.match(app.code, /json\(\s*\{\s*limit\s*:/);
 });
