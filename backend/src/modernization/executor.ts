@@ -223,19 +223,33 @@ async function removeWorktree(root: string, worktreePath: string): Promise<Moder
 /**
  * Delete a run branch that this execution created, after a refusal.
  *
- * `git branch -d` only, never -D, and that is the safety property rather than a
- * limitation: a branch that somehow carries an unmerged commit is then left in
- * place and reported, never destroyed. On every refusal path no commit was
- * made, so the branch still points at the base and the safe delete succeeds.
- * If a run ever failed *after* committing, this is what stops the cleanup from
- * eating the commit the verify stage needs.
+ * The branch was created from BASE_BRANCH. On refusal paths no commit was made,
+ * so the branch still points at the base commit and is an ancestor of BASE_BRANCH.
+ * We verify this explicitly and delete the ref directly, rather than relying on
+ * `git branch -d` which checks against the current HEAD (which may be a feature
+ * branch that has diverged from BASE_BRANCH).
+ *
+ * `git update-ref -d` is a plumbing command that deletes the ref without
+ * porcelain safety checks. Our own explicit ancestry check against BASE_BRANCH
+ * provides the safety property: we only delete branches that are strict
+ * ancestors of BASE_BRANCH, meaning they contain no commits outside it.
+ * Pre-existing branches are never deleted (controlled by the `createdBranch`
+ * flag in the caller). A branch with unmerged commits (not an ancestor of
+ * BASE_BRANCH) is left in place and reported.
  */
 async function removeRunBranch(
   root: string,
   branch: string,
+  baseBranch: string = BASE_BRANCH,
 ): Promise<{ removed: boolean; warning?: string }> {
   try {
-    await git(root, ["branch", "-d", branch]);
+    // Verify the branch is an ancestor of the base branch.
+    // This means it contains no commits outside the base branch,
+    // so it is safe to delete.
+    await git(root, ["merge-base", "--is-ancestor", branch, baseBranch]);
+    // Delete the ref directly. This bypasses `git branch -d`'s check against
+    // the current HEAD, which fails when the working tree is on a diverged branch.
+    await git(root, ["update-ref", "-d", `refs/heads/${branch}`]);
     return { removed: true };
   } catch (err) {
     return {
@@ -368,7 +382,7 @@ export async function executeOperationInWorktree(
     // leave the ref behind. Undo it here, where the finally block is not yet
     // in scope.
     if (createdBranch) {
-      const branchCleanup = await removeRunBranch(root, branch);
+      const branchCleanup = await removeRunBranch(root, branch, BASE_BRANCH);
       result.cleanup.branchRemoved = branchCleanup.removed;
       if (branchCleanup.warning) result.cleanup.warning = branchCleanup.warning;
     }
@@ -436,7 +450,7 @@ export async function executeOperationInWorktree(
     // created is removed — otherwise every refusal leaves a permanent ref at the
     // base commit and `git branch` fills with debris.
     if (createdBranch && result.status !== "completed") {
-      const branchCleanup = await removeRunBranch(root, branch);
+      const branchCleanup = await removeRunBranch(root, branch, BASE_BRANCH);
       result.cleanup.branchRemoved = branchCleanup.removed;
       if (branchCleanup.warning) {
         result.cleanup.warning = result.cleanup.warning
