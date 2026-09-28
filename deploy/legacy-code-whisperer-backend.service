@@ -35,7 +35,8 @@ StartLimitBurst=3
 # Resource limits (adjust based on VM size)
 LimitNOFILE=65536
 LimitNPROC=4096
-MemoryLimit=2G
+# 2 GB VM: reserve ~500 MB for OS, Docker, and system overhead
+MemoryLimit=1500M
 
 # Security hardening
 NoNewPrivileges=true

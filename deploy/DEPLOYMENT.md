@@ -185,7 +185,7 @@ chown -R lcw:lcw /opt/legacy-code-whisperer
 
 ```bash
 # Create backend.env from template
-cp /opt/legacy-code-whisperer/repo/deploy/backend.env.template \
+cp /opt/legacy-code-whisperer/repo/deploy/backend-env.template \
    /opt/legacy-code-whisperer/backend.env
 
 # Edit with actual values
@@ -232,23 +232,13 @@ EOF
 chmod 644 /etc/nginx/auth_token.conf
 
 # Update server_name in nginx.conf to your domain
-sed -i 's/server_name _;/server_name your-domain.example;/' \
+# Use a delimiter that won't conflict with the comment
+sed -i 's|server_name _;|server_name your-domain.example;|' \
        /etc/nginx/sites-available/legacy-code-whisperer
 
-# Update SSL certificate paths (Let's Encrypt example)
-# certbot --nginx -d your-domain.example
-# Then update paths in nginx.conf if needed
+# Create ACME challenge directory for Let's Encrypt
+mkdir -p /var/www/certbot
 
-# Test and reload
-nginx -t
-systemctl reload nginx
-```
-
----
-
-## 13. HTTPS Setup (Let's Encrypt)
-
-```bash
 # Install certbot
 apt-get install -y certbot python3-certbot-nginx
 
@@ -257,6 +247,14 @@ certbot --nginx -d your-domain.example
 
 # Auto-renewal is set up by certbot (systemd timer)
 systemctl status certbot.timer
+```
+
+> **Note:** After certbot obtains the certificate, it will be placed at `/etc/letsencrypt/live/your-domain.example/fullchain.pem` and `/etc/letsencrypt/live/your-domain.example/privkey.pem`. Update the `ssl_certificate` and `ssl_certificate_key` paths in `/etc/nginx/sites-available/legacy-code-whisperer` to match these actual paths (replacing the `_` placeholder), then reload nginx.
+
+```bash
+# Test and reload
+nginx -t
+systemctl reload nginx
 ```
 
 ---
