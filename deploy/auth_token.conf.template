@@ -1,0 +1,19 @@
+# nginx auth token injection for Legacy Code Whisperer
+# This file is generated at deployment time and contains the server-side secret.
+# DO NOT COMMIT THIS FILE WITH REAL CREDENTIALS.
+#
+# Deployment mechanism options:
+# 1. Generate this file from a template during deployment (e.g., envsubst, Ansible, Terraform)
+# 2. Mount as a secret via orchestration system (Kubernetes secret, Docker secret, etc.)
+# 3. Use nginx's `include` with a file populated by your secrets manager
+#
+# The file must contain exactly one line:
+#   proxy_set_header Authorization "Bearer <actual-token>";
+#
+# Example (template):
+#   proxy_set_header Authorization "Bearer {{API_AUTH_TOKEN}}";
+#
+# The actual token must be >= 32 characters (enforced by backend config).
+# The frontend NEVER receives this token.
+
+proxy_set_header Authorization "Bearer {{API_AUTH_TOKEN}}";
