@@ -1,0 +1,63 @@
+# systemd service for Legacy Code Whisperer Backend
+# Copy to /etc/systemd/system/legacy-code-whisperer-backend.service
+# Then run: systemctl daemon-reload && systemctl enable --now legacy-code-whisperer-backend
+
+[Unit]
+Description=Legacy Code Whisperer Backend API
+Documentation=https://github.com/the-nidhi-bhat/Codexmatrix-IBM-Bob-Hackathon
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=lcw
+Group=lcw
+WorkingDirectory=/opt/legacy-code-whisperer/repo
+
+# Environment file with secrets (not committed to git)
+# Create /opt/legacy-code-whisperer/backend.env with:
+# NODE_ENV=production
+# PORT=3001
+# HOST=127.0.0.1
+# API_AUTH_TOKEN=<your-32+-char-token>
+# FRONTEND_ORIGIN=https://your-domain.example
+EnvironmentFile=/opt/legacy-code-whisperer/backend.env
+
+# Start the compiled backend
+ExecStart=/usr/bin/node dist/index.js
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Resource limits (adjust based on VM size)
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryLimit=2G
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/legacy-code-whisperer/repo /opt/legacy-code-whisperer/validation /tmp /var/tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=legacy-code-whisperer-backend
+
+[Install]
+WantedBy=multi-user.target
