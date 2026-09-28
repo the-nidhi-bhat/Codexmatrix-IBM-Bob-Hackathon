@@ -1,6 +1,7 @@
 export interface ServerConfig {
   port: number;
   host: string;
+  production: boolean;
   apiAuthToken?: string;
   frontendOrigin?: string;
 }
@@ -63,5 +64,5 @@ export function loadServerConfig(env: Environment = process.env): ServerConfig {
     throw new Error("FRONTEND_ORIGIN is required in production.");
   }
 
-  return { port, host, apiAuthToken, frontendOrigin };
+  return { port, host, production, apiAuthToken, frontendOrigin };
 }

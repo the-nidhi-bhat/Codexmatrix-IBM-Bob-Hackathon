@@ -19,7 +19,7 @@ Set `PORT` to change the listening port. Local development defaults to loopback 
 | `API_AUTH_TOKEN` | Server-side bearer token required for every `/api` route except `GET /api/health` when configured; required in production or for non-loopback binds. Store it in the host's secret manager. |
 | `FRONTEND_ORIGIN` | One exact HTTP(S) origin added to the CORS allowlist; required in production and must use HTTPS outside localhost. |
 
-Send protected API requests with `Authorization: Bearer <API_AUTH_TOKEN>`. CORS also allows the two existing local frontend origins. The token is a server secret and must never be put in Vite environment variables or browser code. The currently deployed static frontend does not send this bearer token; connecting it to an authenticated hosted backend requires a server-side proxy or real user-authentication design. No backend deployment is configured by this repository.
+Send protected API requests with `Authorization: Bearer <API_AUTH_TOKEN>`. CORS allows the two localhost frontend origins only in development; production allows only the configured `FRONTEND_ORIGIN`. The token is a server secret and must never be put in Vite environment variables or browser code. The currently deployed static frontend does not send this bearer token; connecting it to an authenticated hosted backend requires a server-side proxy or real user-authentication design. No backend deployment is configured by this repository.
 
 ## Routes
 
