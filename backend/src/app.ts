@@ -21,7 +21,10 @@ function matchesToken(candidate: string, expected: string): boolean {
 export function createApp(config: ServerConfig = loadServerConfig()): express.Express {
   const app = express();
 
-  const allowedOrigins = ["http://localhost:5173", "http://localhost:4173", config.frontendOrigin]
+  const allowedOrigins = [
+    ...(config.production ? [] : ["http://localhost:5173", "http://localhost:4173"]),
+    config.frontendOrigin,
+  ]
     .filter((origin): origin is string => Boolean(origin));
   app.use(cors({
     origin: (origin, callback) => callback(null, origin === undefined || allowedOrigins.includes(origin)),
